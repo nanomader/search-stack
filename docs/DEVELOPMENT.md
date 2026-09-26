@@ -76,11 +76,15 @@ Do not replace a packaged app while it is running. Use a separate output folder:
 npm run package:mac -- --config.directories.output=dist/preview
 ```
 
-Run the same hidden-window app tests against the finished macOS bundle:
+Run the same hidden-window app tests against the locally built macOS bundle:
 
 ```sh
 SEARCH_STACK_EXECUTABLE="$PWD/dist/preview/mac-arm64/Search Stack.app/Contents/MacOS/Search Stack" npm run test:e2e
 ```
+
+A quarantined download can trigger a visible macOS security dialog before Electron
+starts, even with hidden test windows. Do not run this suite against a fresh
+download during background work. Its first launch requires manual approval.
 
 Builds and checks run locally. GitHub Actions is disabled for the repository, and the former workflow file has
 been removed to prevent automatic hosted runs.

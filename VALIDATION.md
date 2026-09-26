@@ -120,8 +120,8 @@ Evidence: `output/playwright/packaged-split.json` (excluded from Git).
 
 These tests establish the covered application behaviors on this Mac, not universal
 provider availability or native Windows/Linux support. They do not establish
-behavior under every memory-pressure, network, or OS failure. The macOS preview is ad-hoc signed and not notarized. A clean-account Gatekeeper
-launch, Intel Mac, and native Windows release qualification remain unverified.
+behavior under every memory-pressure, network, or OS failure. The macOS preview is ad-hoc signed and not notarized. A launch after manual Gatekeeper approval, Intel Mac, and native Windows release
+qualification remain unverified.
 
 ## First public preview (0.1.0)
 
@@ -142,3 +142,28 @@ Artifacts were built locally into `dist/release-0.1.0` with publishing disabled:
 GitHub Actions was disabled for the entire source repository, beyond disabling
 the old workflow. The README uses real Day/Night app captures and a clearly
 separate generated hamster illustration.
+
+### Published download and Homebrew installation
+
+The public `v0.1.0` release points to commit
+`747f172b87dc2f34050f68b952ec16e5c891a9b0`. All seven source files in the packaged
+ASAR were byte-compared with the release source. GitHub's uploaded-asset digests
+match the local DMG and ZIP checksums above.
+
+Homebrew downloaded the public DMG, verified its checksum, and installed it into
+a separate temporary app directory. `brew info` correctly reports ARM64 and
+macOS >= 13 requirements. The installed bundle passes strict deep signature
+verification. Uninstall also passed and removed only this test installation.
+
+**Downloaded-app launch was blocked by Gatekeeper.** The seven passing packaged
+scenarios above used the locally built copy. When repeated against the quarantined
+Homebrew copy, four scenarios failed before Electron could launch; the remaining
+three were stopped. macOS displayed the unverified-app warning. No app security
+exception or quarantine bypass was applied. Launch after the user selects
+Open Anyway remains unverified, and the README and cask explain that first-launch
+step. Hidden Electron windows cannot suppress a macOS security dialog.
+
+Both public repositories have GitHub Actions disabled. No new Actions run was
+created by publication: the source repo retained its one historical completed
+run, and the tap had zero runs. Public README and illustration URLs returned HTTP
+200 without authentication.
