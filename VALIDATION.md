@@ -214,3 +214,26 @@ Builds and tests ran locally. The existing Apple membership and Keychain
 notarization profile were reused without exporting credentials. No GitHub Actions
 run, Gatekeeper override, or quarantine removal was used. Download/install
 verification is recorded separately after publication.
+
+### Published 0.1.1 installation
+
+Homebrew downloaded the published DMG and upgraded the existing 0.1.0 installation
+to 0.1.1. GitHub's asset digests match the final checksums above. The installed
+app passes strict deep signature verification and Gatekeeper reports **accepted,
+Notarized Developer ID**.
+
+The first automated launch attempt was interrupted when the user selected
+**Move to Bin** in a macOS dialog, removing the app. That attempt is not counted
+as a passing launch. After reinstalling through Homebrew, normal LaunchServices
+launch (`open -g`) succeeded using a disposable test profile. All seven
+end-to-end scenarios then passed against `/Applications/Search Stack.app` in
+hidden windows (17.8 seconds). Quarantine remained present throughout; no
+Gatekeeper exception or quarantine removal was used.
+
+A separate live smoke test against that installed app loaded Bing and DuckDuckGo
+for `best walks in the Lake District` in two visible native panes inside a hidden
+window. Both pages reported the expected search titles and query text. The app
+reported packaged version 0.1.1. Test profiles were separate from the user's data.
+
+The Homebrew tap points to 0.1.1 with the published DMG checksum. GitHub Actions
+remains disabled for both repositories. The installed app is retained for use.
