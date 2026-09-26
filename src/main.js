@@ -6,6 +6,7 @@ const {
   BaseWindow,
   Menu,
   net,
+  nativeTheme,
   protocol,
   session,
   WebContentsView,
@@ -24,50 +25,11 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-const PROVIDERS = {
-  google: {
-    label: 'Google',
-    searchUrl(query) {
-      const url = new URL('https://www.google.com/search');
-      url.searchParams.set('q', query);
-      return url.toString();
-    },
-  },
-  bing: {
-    label: 'Bing',
-    searchUrl(query) {
-      const url = new URL('https://www.bing.com/search');
-      url.searchParams.set('q', query);
-      return url.toString();
-    },
-  },
-  yahoo: {
-    label: 'Yahoo',
-    searchUrl(query) {
-      const url = new URL('https://search.yahoo.com/search');
-      url.searchParams.set('p', query);
-      return url.toString();
-    },
-  },
-  baidu: {
-    label: 'Baidu',
-    searchUrl(query) {
-      const url = new URL('https://www.baidu.com/s');
-      url.searchParams.set('wd', query);
-      return url.toString();
-    },
-  },
-};
+const { DEFAULT_SETTINGS, MAX_ACTIVE_PAGES, validateSettings, enginesFor, searchUrl, isSafeHttpsUrl } = require('./settings');
+let PROVIDERS = {};
+function refreshProviders() { PROVIDERS = Object.fromEntries(enginesFor(settings).map(e => [e.id, e])); }
 
-const MAX_PROFILES = 12;
-const MAX_ACTIVE_PAGES = 12;
-const PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
-const DEFAULT_SETTINGS = {
-  version: 1,
-  profiles: [{ id: 'default', name: 'Default' }],
-  engineProfiles: Object.fromEntries(Object.keys(PROVIDERS).map((id) => [id, ['default']])),
-};
-
+const backgroundTest = app.commandLine.hasSwitch('background-test');
 const providerViews = new Map();
 const installedProviderSessions = new Set();
 let windowRef;
@@ -76,6 +38,13 @@ let currentViewKeys = new Set();
 let currentSearchProviders = [];
 let searchGeneration = 0;
 let settingsOverlayOpen = false;
+let activeViewKey = '';
+let settingsQueue = Promise.resolve();
+function queueSettings(operation) {
+  const result = settingsQueue.then(operation);
+  settingsQueue = result.catch(() => {});
+  return result;
+}
 let settings = structuredClone(DEFAULT_SETTINGS);
 
 const assetFiles = new Map([
@@ -86,43 +55,6 @@ const assetFiles = new Map([
 
 function cloneSettings(value) {
   return structuredClone(value);
-}
-
-function validateSettings(value) {
-  if (!value || typeof value !== 'object' || !Array.isArray(value.profiles) || !value.engineProfiles) {
-    throw new Error('Settings are invalid.');
-  }
-  if (value.profiles.length < 1 || value.profiles.length > MAX_PROFILES) {
-    throw new Error(`Create between 1 and ${MAX_PROFILES} profiles.`);
-  }
-
-  const profiles = [];
-  const ids = new Set();
-  const names = new Set();
-  for (const profile of value.profiles) {
-    const id = String(profile?.id || '');
-    const name = String(profile?.name || '').trim();
-    if (!PROFILE_ID_PATTERN.test(id) || ids.has(id)) throw new Error('Profile identifiers are invalid.');
-    if (!name || name.length > 48 || /[\u0000-\u001f\u007f]/.test(name)) {
-      throw new Error('Profile names must be 1–48 characters long.');
-    }
-    const normalizedName = name.toLowerCase();
-    if (names.has(normalizedName)) throw new Error('Profile names must be unique.');
-    ids.add(id);
-    names.add(normalizedName);
-    profiles.push({ id, name });
-  }
-  if (!ids.has('default')) throw new Error('The Default profile must remain available.');
-
-  const engineProfiles = {};
-  for (const providerId of Object.keys(PROVIDERS)) {
-    const selected = value.engineProfiles[providerId];
-    if (!Array.isArray(selected)) throw new Error('Choose profiles for each search engine.');
-    const unique = [...new Set(selected.map((id) => String(id)))];
-    if (unique.some((id) => !ids.has(id))) throw new Error('A selected profile no longer exists.');
-    engineProfiles[providerId] = unique;
-  }
-  return { version: 1, profiles, engineProfiles };
 }
 
 async function loadSettings() {
@@ -181,20 +113,13 @@ function findProviderState(sender) {
   return null;
 }
 
-function isSafeHttpsUrl(rawUrl) {
-  try {
-    const url = new URL(rawUrl);
-    return url.protocol === 'https:' && !url.username && !url.password;
-  } catch {
-    return false;
-  }
-}
-
 function sendToApp(channel, payload) {
   if (appView && !appView.webContents.isDestroyed()) appView.webContents.send(channel, payload);
 }
 
 function sendStatus(state, status, details = {}) {
+  state.status = status;
+  if (['ready', 'error', 'crashed', 'stopped', 'unresponsive'].includes(status)) clearTimeout(state.loadTimer);
   if (state.generation !== searchGeneration || !currentViewKeys.has(state.key)) return;
   sendToApp('app:provider-status', {
     providerId: state.providerId,
@@ -209,6 +134,7 @@ function sendHistoryState(state) {
   if (state.view.webContents.isDestroyed()) return;
   sendToApp('app:history-state', {
     viewKey: state.key,
+    url: state.view.webContents.getURL(),
     canGoBack: state.view.webContents.navigationHistory.canGoBack(),
     canGoForward: state.view.webContents.navigationHistory.canGoForward(),
   });
@@ -255,7 +181,6 @@ function installProviderSession(providerId, profileId, providerSession) {
 }
 
 function createProviderView(providerId, profileId) {
-  const provider = PROVIDERS[providerId];
   const partition = partitionFor(providerId, profileId);
   const providerSession = session.fromPartition(partition);
   installProviderSession(providerId, profileId, providerSession);
@@ -275,11 +200,51 @@ function createProviderView(providerId, profileId) {
   view.setVisible(false);
 
   const key = viewKey(providerId, profileId);
-  const state = { view, key, providerId, profileId, generation: 0 };
+  const state = { view, key, providerId, profileId, generation: 0, status: 'loading', lastUrl: '', loadTimer: null };
   providerViews.set(key, state);
+  // Electron's native 'unresponsive' event is not reliable for every composed
+  // view. A ping to the isolated preload checks the visible page's event loop.
+  state.healthTimer = setInterval(() => {
+    if (view.webContents.isDestroyed()) return;
+    if (!view.getVisible() || settingsOverlayOpen || windowRef?.isMinimized() || !state.documentReady) {
+      state.pingSentAt = 0; return;
+    }
+    if (state.pingSentAt) {
+      if (Date.now() - state.pingSentAt > 8000) {
+        sendStatus(state, 'unresponsive', { message: 'Page is not responding. Reload to recover.' });
+      }
+      return;
+    }
+    state.pingSentAt = Date.now();
+    view.webContents.send('provider:ping');
+  }, 2000);
+  state.healthTimer.unref();
 
-  view.webContents.on('did-start-loading', () => sendStatus(state, 'loading'));
-  view.webContents.on('did-stop-loading', () => sendStatus(state, 'ready'));
+  view.webContents.on('did-start-navigation', (_event, url, inPlace, isMainFrame) => {
+    if (!isMainFrame || inPlace) return;
+    state.lastUrl = url;
+    state.documentReady = false;
+    state.pingSentAt = 0;
+    clearTimeout(state.loadTimer);
+    sendStatus(state, 'loading');
+    state.loadTimer = setTimeout(() => {
+      if (state.status === 'loading') sendStatus(state, 'slow', { message: 'Taking longer than expected' });
+    }, 15000);
+  });
+  view.webContents.on('dom-ready', () => { state.documentReady = true; state.pingSentAt = 0; });
+  view.webContents.on('did-stop-loading', () => {
+    if (['loading', 'slow'].includes(state.status)) sendStatus(state, 'ready');
+  });
+  view.webContents.on('unresponsive', () => sendStatus(state, 'unresponsive', { message: 'Page is not responding. Reload to recover.' }));
+  view.webContents.on('responsive', () => {
+    if (state.status === 'unresponsive') sendStatus(state, 'ready');
+  });
+  view.webContents.on('render-process-gone', (_event, details) => {
+    view.setVisible(false);
+    sendStatus(state, 'crashed', { message: `Page stopped (${details.reason}). Reload to recover.` });
+  });
+  installShortcuts(view.webContents);
+  view.webContents.on('focus', () => { activeViewKey = key; });
   view.webContents.on('did-fail-load', (_event, errorCode, errorDescription, _validatedURL, isMainFrame) => {
     if (isMainFrame && errorCode !== -3) sendStatus(state, 'error', { message: errorDescription });
   });
@@ -292,7 +257,7 @@ function createProviderView(providerId, profileId) {
   view.webContents.on('will-redirect', (event, targetUrl) => {
     if (!isSafeHttpsUrl(targetUrl)) event.preventDefault();
   });
-  view.webContents.on('did-navigate', () => sendHistoryState(state));
+  view.webContents.on('did-navigate', () => { state.lastUrl = view.webContents.getURL(); sendHistoryState(state); });
   view.webContents.on('did-navigate-in-page', () => sendHistoryState(state));
   view.webContents.on('did-finish-load', () => sendHistoryState(state));
   view.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -344,11 +309,16 @@ function runSearch(query, providerIds) {
   }
 
   for (const target of targets) {
+    const previous = providerViews.get(target.viewKey);
+    if (previous && ['crashed', 'unresponsive', 'slow'].includes(previous.status)) {
+      destroyProviderView(target.viewKey);
+      currentViewKeys.add(target.viewKey);
+    }
     const state = providerViews.get(target.viewKey) || createProviderView(target.providerId, target.profileId);
     state.generation = thisGeneration;
-    state.view.setVisible(true);
+    state.view.setVisible(false);
     sendStatus(state, 'loading');
-    void state.view.webContents.loadURL(PROVIDERS[target.providerId].searchUrl(normalizedQuery)).catch((error) => {
+    void state.view.webContents.loadURL(searchUrl(PROVIDERS[target.providerId], normalizedQuery)).catch((error) => {
       if (state.generation === thisGeneration && !String(error).includes('ERR_ABORTED')) {
         sendStatus(state, 'error', { message: error.message });
       }
@@ -383,7 +353,7 @@ function syncProviderLayout(rectangles) {
     const height = Number(rect.height);
     if (![x, y, width, height].every(Number.isFinite)) continue;
 
-    const visible = width > 1 && height > 1 && y < windowHeight && y + height > 0;
+    const visible = !['error', 'crashed', 'unresponsive'].includes(state.status) && width > 1 && height > 1 && y < windowHeight && y + height > 0;
     state.view.setVisible(visible);
     if (!visible) continue;
 
@@ -398,6 +368,8 @@ function syncProviderLayout(rectangles) {
 function destroyProviderView(key) {
   const state = providerViews.get(key);
   if (!state) return;
+  clearTimeout(state.loadTimer);
+  clearInterval(state.healthTimer);
   windowRef?.contentView.removeChildView(state.view);
   providerViews.delete(key);
   currentViewKeys.delete(key);
@@ -412,7 +384,7 @@ function clearActiveSearchViews() {
 }
 
 function pruneViewsToSettings() {
-  const allowedKeys = new Set(searchTargets(currentSearchProviders).map((target) => target.viewKey));
+  const allowedKeys = new Set(searchTargets(currentSearchProviders.filter(id => PROVIDERS[id])).map((target) => target.viewKey));
   currentViewKeys = new Set([...currentViewKeys].filter((key) => allowedKeys.has(key)));
   for (const key of providerViews.keys()) {
     if (!allowedKeys.has(key)) destroyProviderView(key);
@@ -438,52 +410,75 @@ async function saveSettings(payload) {
   const nextSettings = validateSettings(payload);
   const nextIds = new Set(nextSettings.profiles.map((profile) => profile.id));
   const removedProfiles = settings.profiles.filter((profile) => !nextIds.has(profile.id));
+  const removedEngines = settings.customEngines.filter(engine => !nextSettings.customEngines.some(next => next.id === engine.id));
 
-  if (removedProfiles.length) {
-    const names = removedProfiles.map((profile) => `“${profile.name}”`).join(', ');
+  if (removedProfiles.length || removedEngines.length) {
+    const names = [...removedProfiles.map(p => `profile “${p.name}”`), ...removedEngines.map(e => `engine “${e.label}”`)].join(', ');
     const { response } = await require('electron').dialog.showMessageBox(windowRef, {
       type: 'warning',
-      buttons: ['Keep profile', 'Delete profile and data'],
+      buttons: ['Cancel', 'Delete and clear data'],
       defaultId: 0,
       cancelId: 0,
       noLink: true,
       message: `Delete ${names}?`,
-      detail: 'This permanently removes the profile’s saved sign-ins, cookies, and site data for every search engine.',
+      detail: 'This permanently clears saved sign-ins, cookies, and site data belonging to the removed profiles or engines.',
     });
     if (response !== 1) return { cancelled: true, settings: cloneSettings(settings) };
 
     for (const profile of removedProfiles) await deleteProfileData(profile.id);
+    for (const engine of removedEngines) {
+      for (const profile of settings.profiles) {
+        destroyProviderView(viewKey(engine.id, profile.id));
+        const oldSession = session.fromPartition(partitionFor(engine.id, profile.id));
+        await oldSession.clearStorageData(); await oldSession.clearCache();
+      }
+    }
   }
 
   await persistSettings(nextSettings);
   settings = nextSettings;
+  refreshProviders();
+  nativeTheme.themeSource = settings.theme;
   pruneViewsToSettings();
   return { cancelled: false, settings: cloneSettings(settings) };
 }
 
+function appCommand(command) {
+  if (!appView || appView.webContents.isDestroyed()) return;
+  appView.webContents.focus();
+  sendToApp('app:command', command);
+}
+function installShortcuts(contents) {
+  contents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    const key = input.key.toLowerCase();
+    const mod = process.platform === 'darwin' ? input.meta : input.control;
+    let command;
+    if (mod && ['l', 'k'].includes(key)) command = 'search';
+    else if (mod && key === ',') command = 'settings';
+    else if (input.control && key === 'tab') command = input.shift ? 'previous' : 'next';
+    else if (mod && /^[1-9]$/.test(key)) command = `page-${key}`;
+    else if (mod && input.shift && key === 's') command = 'layout';
+    else if (!settingsOverlayOpen && ((mod && key === 'r') || key === 'f5')) {
+      event.preventDefault(); navigatePage(activeViewKey, 'reload'); return;
+    } else if (!settingsOverlayOpen && key === 'escape') {
+      event.preventDefault(); navigatePage(activeViewKey, 'stop'); return;
+    } else if (!settingsOverlayOpen && ((input.alt && ['arrowleft', 'arrowright'].includes(key)) || (mod && ['[', ']'].includes(key)))) {
+      event.preventDefault(); navigatePage(activeViewKey, ['arrowleft', '['].includes(key) ? 'back' : 'forward'); return;
+    }
+    if (command) { event.preventDefault(); appCommand(command); }
+  });
+}
 function installMenu() {
-  const focusAccelerator = process.platform === 'darwin' ? 'Command+L' : 'Ctrl+L';
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    {
-      label: 'Search Stack',
-      submenu: [
-        { label: 'Focus search', accelerator: focusAccelerator, click: () => appView?.webContents.send('app:focus-search') },
-        { type: 'separator' },
-        { role: 'quit' },
-      ],
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' },
-      ],
-    },
+    { label: 'Search Stack', submenu: [
+      { label: 'Search', click: () => appCommand('search') },
+      { label: 'Settings…', click: () => appCommand('settings') },
+      { type: 'separator' }, { role: 'quit' },
+    ] },
+    { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' },
+      { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
+    { label: 'View', submenu: [{ role: 'togglefullscreen' }, { role: 'minimize' }] },
   ]));
 }
 
@@ -491,9 +486,11 @@ function createWindow() {
   windowRef = new BaseWindow({
     width: 1180,
     height: 860,
-    minWidth: 760,
-    minHeight: 620,
+    minWidth: 680,
+    minHeight: 480,
+    autoHideMenuBar: true,
     title: 'Search Stack',
+    show: !backgroundTest,
     backgroundColor: '#0b0d10',
   });
 
@@ -509,6 +506,7 @@ function createWindow() {
   appView.setBounds({ x: 0, y: 0, width: 1180, height: 860 });
   windowRef.contentView.addChildView(appView);
   installMenu();
+  installShortcuts(appView.webContents);
 
   appView.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   appView.webContents.on('will-navigate', (event, targetUrl) => {
@@ -541,7 +539,9 @@ function createWindow() {
     appView.webContents.send('app:layout-changed');
   });
   windowRef.on('closed', () => {
-    for (const { view } of providerViews.values()) {
+    for (const { view, loadTimer, healthTimer } of providerViews.values()) {
+      clearTimeout(loadTimer);
+      clearInterval(healthTimer);
       if (!view.webContents.isDestroyed()) view.webContents.close();
     }
     if (appView && !appView.webContents.isDestroyed()) appView.webContents.close();
@@ -563,11 +563,14 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   await loadSettings();
+  refreshProviders();
+  nativeTheme.themeSource = settings.theme;
   protocol.handle('app', (request) => {
     const filePath = appAssetPath(request.url);
     if (!filePath) return new Response('Not found', { status: 404 });
     return net.fetch(pathToFileURL(filePath).toString());
   });
+  if (backgroundTest && process.platform === 'darwin') app.setActivationPolicy('prohibited');
   createWindow();
 });
 
@@ -597,25 +600,47 @@ ipcMain.handle('app:get-settings', (event) => {
 });
 ipcMain.handle('app:save-settings', async (event, payload) => {
   if (!isAppRenderer(event.sender)) throw new Error('Unauthorized app message.');
-  return saveSettings(payload);
+  return queueSettings(() => saveSettings(payload));
 });
+ipcMain.handle('app:preferences', (event, patch) => {
+  if (!isAppRenderer(event.sender)) throw new Error('Unauthorized app message.');
+  return queueSettings(async () => {
+    const next = validateSettings({ ...settings,
+      enabledEngines: patch?.enabledEngines ?? settings.enabledEngines,
+      presentation: patch?.presentation ?? settings.presentation,
+    });
+    await persistSettings(next); settings = next;
+    return cloneSettings(settings);
+  });
+});
+function navigatePage(key, action) {
+  const state = providerViews.get(key);
+  if (!state || !currentViewKeys.has(key) || state.view.webContents.isDestroyed()) return;
+  const wc = state.view.webContents;
+  if (action === 'back') { if (wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack(); }
+  else if (action === 'forward') { if (wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward(); }
+  else if (action === 'stop') { sendStatus(state, 'stopped', { message: 'Loading stopped' }); wc.stop(); }
+  else if (action === 'reload') {
+    const url = state.lastUrl || wc.getURL();
+    if (!isSafeHttpsUrl(url)) return;
+    if (['crashed', 'unresponsive', 'slow'].includes(state.status)) {
+      const { providerId, profileId, generation } = state;
+      destroyProviderView(key);
+      currentViewKeys.add(key);
+      const replacement = createProviderView(providerId, profileId);
+      replacement.generation = generation;
+      void replacement.view.webContents.loadURL(url).catch(() => {});
+    } else if (state.status === 'error') void wc.loadURL(url).catch(() => {});
+    else wc.reload();
+    sendToApp('app:layout-changed');
+  } else throw new Error('Unsupported navigation action.');
+}
 ipcMain.handle('app:navigate', (event, payload) => {
   if (!isAppRenderer(event.sender)) throw new Error('Unauthorized app message.');
-  const state = providerViews.get(String(payload?.viewKey || ''));
-  if (!state || !currentViewKeys.has(state.key) || state.view.webContents.isDestroyed()) return null;
-
-  if (payload.action === 'back' && state.view.webContents.navigationHistory.canGoBack()) {
-    state.view.webContents.navigationHistory.goBack();
-  } else if (payload.action === 'forward' && state.view.webContents.navigationHistory.canGoForward()) {
-    state.view.webContents.navigationHistory.goForward();
-  }
-  else if (payload.action === 'reload') state.view.webContents.reload();
-  else throw new Error('Unsupported navigation action.');
-
-  return {
-    canGoBack: state.view.webContents.navigationHistory.canGoBack(),
-    canGoForward: state.view.webContents.navigationHistory.canGoForward(),
-  };
+  return navigatePage(String(payload?.viewKey || ''), payload?.action);
+});
+ipcMain.on('app:active-page', (event, key) => {
+  if (isAppRenderer(event.sender) && currentViewKeys.has(key)) activeViewKey = key;
 });
 ipcMain.handle('provider:open-link', (event, rawUrl) => {
   const state = findProviderState(event.sender);
@@ -639,4 +664,9 @@ ipcMain.on('provider:edge-wheel', (event, deltaY) => {
   if (!state || !currentViewKeys.has(state.key) || !Number.isFinite(deltaY)) return;
   const boundedDelta = Math.max(-1600, Math.min(1600, deltaY));
   sendToApp('app:scroll-by', boundedDelta);
+});
+
+ipcMain.on('provider:pong', event => {
+  const state = findProviderState(event.sender);
+  if (state && event.senderFrame === event.sender.mainFrame) state.pingSentAt = 0;
 });

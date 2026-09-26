@@ -21,10 +21,11 @@ const newProfileInput = document.querySelector('#new-profile-name');
 let providers = [];
 let currentSettings = null;
 let workingSettings = null;
+let settingsSaving = false;
 let currentQuery = '';
 let currentProviderIds = [];
 let activeViewKey = '';
-let focusScan = false;
+let focusScan = true;
 let scrollYBeforeFocus = 0;
 let layoutFrame = 0;
 let activeTargetFrame = 0;
@@ -61,6 +62,7 @@ function updateScanNavigation() {
     button.classList.toggle('is-active', selected);
     button.setAttribute('aria-current', selected ? 'location' : 'false');
   });
+  buttons[activeIndex]?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   scanCounter.textContent = buttons.length && activeIndex >= 0
     ? `${activeIndex + 1} of ${buttons.length}`
     : `0 of ${buttons.length}`;
@@ -68,8 +70,8 @@ function updateScanNavigation() {
   scanNext.disabled = activeIndex < 0 || activeIndex >= buttons.length - 1;
   scanModeToggle.setAttribute('aria-pressed', String(focusScan));
   scanModeToggle.innerHTML = focusScan
-    ? '<span aria-hidden="true">▤</span> Return to stack'
-    : '<span aria-hidden="true">⛶</span> Focus scan';
+    ? '▤ Stack'
+    : '⛶ Focus';
 }
 
 function renderScanNavigation(targets) {
@@ -105,13 +107,13 @@ function renderScanNavigation(targets) {
 
 function applyPresentation() {
   const sections = resultSections();
-  if (!sections.length) focusScan = false;
   document.body.dataset.presentation = focusScan ? 'focus' : 'stack';
   scanToolbar.hidden = sections.length === 0;
   for (const section of sections) {
     section.hidden = focusScan && section.dataset.viewKey !== activeViewKey;
   }
   updateScanNavigation();
+  window.searchStack.setActivePage(activeViewKey);
   scheduleLayoutSync();
 }
 
@@ -119,6 +121,7 @@ function selectScanTarget(viewKey, { jumpToSection = false } = {}) {
   const section = resultSections().find((item) => item.dataset.viewKey === viewKey);
   if (!section) return;
   activeViewKey = viewKey;
+  window.searchStack.setActivePage(viewKey);
   if (focusScan) {
     applyPresentation();
     return;
@@ -187,20 +190,12 @@ function updateActiveTargetFromScroll() {
   }
   if (active.dataset.viewKey !== activeViewKey) {
     activeViewKey = active.dataset.viewKey;
+    window.searchStack.setActivePage(activeViewKey);
     updateScanNavigation();
   }
 }
 
-function updateSearchButtonLabel() {
-  if (searchButton.disabled) return;
-  const selectedCount = checkedProviderIds().length;
-  const label = selectedCount === providers.length
-    ? 'Search all'
-    : selectedCount > 0
-      ? 'Search selected'
-      : 'Choose engines';
-  searchButton.innerHTML = `<span aria-hidden="true">↵</span> ${label}`;
-}
+function updateSearchButtonLabel() { searchButton.textContent = 'Search ↵'; }
 
 function makeProviderPicker(engineProviders) {
   providers = engineProviders;
@@ -211,9 +206,10 @@ function makeProviderPicker(engineProviders) {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.value = id;
-    checkbox.checked = true;
+    checkbox.checked = currentSettings?.enabledEngines.includes(id) ?? false;
     checkbox.addEventListener('change', () => {
       currentProviderIds = checkedProviderIds();
+      savePreferences({ enabledEngines: currentProviderIds });
       updateSearchButtonLabel();
       scheduleLayoutSync();
       if (currentQuery && currentProviderIds.length) void submitSearch(currentQuery);
@@ -237,20 +233,10 @@ function makeProviderPicker(engineProviders) {
 }
 
 function setError(message) {
-  let notice = document.querySelector('#app-notice');
-  if (!notice) {
-    notice = document.createElement('p');
-    notice.id = 'app-notice';
-    notice.className = 'error-message';
-    notice.setAttribute('role', 'status');
-    enginePicker.after(notice);
-  }
-  notice.textContent = message;
+  const notice = document.querySelector('#app-notice');
+  notice.textContent = message; notice.hidden = false;
 }
-
-function clearError() {
-  document.querySelector('#app-notice')?.remove();
-}
+function clearError() { document.querySelector('#app-notice').hidden = true; }
 
 function createNavigationButton(action, label, symbol, disabled = false) {
   const button = document.createElement('button');
@@ -286,7 +272,8 @@ function createResultSection(target, index) {
   const profileBadge = document.createElement('span');
   profileBadge.className = 'profile-badge';
   profileBadge.textContent = target.profileName;
-  titleWrap.append(title, profileBadge);
+  const location = document.createElement('span'); location.className = 'page-location';
+  titleWrap.append(title, profileBadge, location);
   left.append(number, titleWrap);
 
   const tools = document.createElement('div');
@@ -298,6 +285,7 @@ function createResultSection(target, index) {
     createNavigationButton('back', 'Back', '←', true),
     createNavigationButton('forward', 'Forward', '→', true),
     createNavigationButton('reload', 'Reload', '↻'),
+    createNavigationButton('stop', 'Stop loading', '×'),
   );
   const focusButton = document.createElement('button');
   focusButton.className = 'focus-engine-button';
@@ -309,7 +297,7 @@ function createResultSection(target, index) {
   status.className = 'engine-state';
   status.dataset.status = 'loading';
   status.textContent = `Searching for “${currentQuery}”`;
-  tools.append(history, focusButton, status);
+  tools.append(status, history, focusButton);
   heading.append(left, tools);
 
   const slot = document.createElement('div');
@@ -330,10 +318,10 @@ function syncLayout() {
     const rect = slot.getBoundingClientRect();
     rectangles.push({
       viewKey: slot.dataset.viewKey,
-      x: rect.left,
-      y: rect.top,
-      width: rect.width,
-      height: rect.height,
+      x: Math.round(rect.left),
+      y: Math.round(Math.max(rect.top, focusScan ? 0 : 96)),
+      width: Math.round(rect.width),
+      height: Math.round(Math.max(0, rect.bottom - Math.max(rect.top, focusScan ? 0 : 96))),
     });
   }
   window.searchStack.syncLayout(rectangles);
@@ -372,6 +360,8 @@ async function submitSearch(query) {
   }
 
   clearError();
+  const firstSearch = !currentQuery;
+  if (firstSearch) focusScan = currentSettings.presentation !== 'stack';
   currentQuery = normalized;
   currentProviderIds = providerIds;
   queryInput.value = normalized;
@@ -386,6 +376,7 @@ async function submitSearch(query) {
   searchButton.innerHTML = '<span aria-hidden="true">…</span> Searching';
   try {
     await window.searchStack.search(normalized, providerIds);
+    window.searchStack.setActivePage(activeViewKey);
   } catch (error) {
     currentQuery = '';
     clearResults();
@@ -402,11 +393,6 @@ function clearResults() {
   scanTabs.replaceChildren();
   cancelScrollJump();
   activeViewKey = '';
-  if (focusScan) {
-    focusScan = false;
-    document.body.dataset.presentation = 'stack';
-    requestAnimationFrame(() => window.scrollTo({ top: scrollYBeforeFocus, behavior: 'auto' }));
-  }
   applyPresentation();
   emptyState.hidden = false;
   scheduleLayoutSync();
@@ -440,7 +426,7 @@ function renderProfileEditor() {
       remove.setAttribute('aria-label', `Remove ${profile.name} profile`);
       remove.addEventListener('click', () => {
         workingSettings.profiles = workingSettings.profiles.filter((item) => item.id !== profile.id);
-        for (const provider of providers) {
+        for (const provider of editorProviders()) {
           workingSettings.engineProfiles[provider.id] = workingSettings.engineProfiles[provider.id]
             .filter((id) => id !== profile.id);
         }
@@ -455,11 +441,28 @@ function renderProfileEditor() {
 function renderProfileMatrix() {
   if (!workingSettings) return;
   profileMatrix.replaceChildren();
-  for (const provider of providers) {
+  for (const provider of editorProviders()) {
     const engine = document.createElement('section');
     engine.className = 'profile-engine';
     const title = document.createElement('h4');
-    title.textContent = provider.label;
+    const enabledLabel = document.createElement('label');
+    const enabled = document.createElement('input');
+    enabled.type = 'checkbox'; enabled.checked = workingSettings.enabledEngines.includes(provider.id);
+    enabled.setAttribute('aria-label', `Enable ${provider.label}`);
+    enabled.addEventListener('change', () => {
+      workingSettings.enabledEngines = enabled.checked ? [...workingSettings.enabledEngines, provider.id] : workingSettings.enabledEngines.filter(id => id !== provider.id);
+    });
+    enabledLabel.append(enabled, document.createTextNode(` ${provider.label}`));
+    title.append(enabledLabel);
+    if (provider.id.startsWith('custom-')) {
+      const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Remove'; remove.className = 'remove-profile-button';
+      remove.setAttribute('aria-label', `Remove ${provider.label} engine`);
+      remove.addEventListener('click', () => {
+        workingSettings.customEngines = workingSettings.customEngines.filter(e => e.id !== provider.id);
+        workingSettings.enabledEngines = workingSettings.enabledEngines.filter(id => id !== provider.id);
+        delete workingSettings.engineProfiles[provider.id]; renderProfileMatrix();
+      }); title.append(remove);
+    }
     const choices = document.createElement('div');
     choices.className = 'profile-engine-choices';
     for (const profile of workingSettings.profiles) {
@@ -467,6 +470,7 @@ function renderProfileMatrix() {
       label.className = 'profile-choice';
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
+      checkbox.setAttribute('aria-label', `${provider.label}: ${profile.name}`);
       checkbox.checked = workingSettings.engineProfiles[provider.id].includes(profile.id);
       checkbox.addEventListener('change', () => {
         const selected = workingSettings.engineProfiles[provider.id];
@@ -490,9 +494,12 @@ function renderSettingsEditor() {
 }
 
 async function openSettings() {
+  if (settingsDialog.open) return;
   try {
     currentSettings = await window.searchStack.getSettings();
     workingSettings = cloneSettings(currentSettings);
+    workingSettings.enabledEngines = checkedProviderIds();
+    document.querySelector('#theme').value = workingSettings.theme;
     settingsNotice.textContent = '';
     newProfileInput.value = '';
     renderSettingsEditor();
@@ -531,7 +538,9 @@ function addProfile() {
 }
 
 async function saveSettings() {
-  settingsSaveButton.disabled = true;
+  if (settingsSaving) return;
+  settingsSaving = true;
+  settingsDialog.querySelectorAll('button, input, select').forEach(control => { control.disabled = true; });
   settingsNotice.textContent = 'Saving settings…';
   try {
     const result = await window.searchStack.saveSettings(workingSettings);
@@ -539,17 +548,24 @@ async function saveSettings() {
       currentSettings = result.settings;
       workingSettings = cloneSettings(result.settings);
       renderSettingsEditor();
+      document.querySelector('#theme').value = workingSettings.theme;
+      applyTheme();
       settingsNotice.textContent = 'No changes saved.';
       return;
     }
+    const searchChanged = JSON.stringify([currentSettings.engineProfiles, currentSettings.customEngines, checkedProviderIds()]) !== JSON.stringify([result.settings.engineProfiles, result.settings.customEngines, result.settings.enabledEngines]);
     currentSettings = result.settings;
+    applyTheme();
+    makeProviderPicker([...providers.filter(e => !e.id.startsWith('custom-')), ...currentSettings.customEngines]);
+    currentProviderIds = checkedProviderIds();
     workingSettings = null;
     settingsDialog.close();
-    if (currentQuery && currentProviderIds.length) await submitSearch(currentQuery);
+    if (currentQuery && searchChanged) await submitSearch(currentQuery);
   } catch (error) {
     settingsNotice.textContent = error.message || 'Settings could not be saved.';
   } finally {
-    settingsSaveButton.disabled = false;
+    settingsSaving = false;
+    settingsDialog.querySelectorAll('button, input, select').forEach(control => { control.disabled = false; });
   }
 }
 
@@ -561,7 +577,9 @@ form.addEventListener('submit', (event) => {
 settingsButton.addEventListener('click', () => void openSettings());
 document.querySelector('#settings-close').addEventListener('click', () => settingsDialog.close());
 document.querySelector('#settings-cancel').addEventListener('click', () => settingsDialog.close());
-settingsDialog.addEventListener('close', () => window.searchStack.setSettingsOpen(false));
+settingsDialog.addEventListener('cancel', event => { if (settingsSaving) event.preventDefault(); });
+settingsDialog.addEventListener('close', () => { workingSettings = null; applyTheme(); window.searchStack.setSettingsOpen(false); scheduleLayoutSync(); });
+document.querySelector('#settings-form').addEventListener('submit', event => event.preventDefault());
 document.querySelector('#add-profile-button').addEventListener('click', addProfile);
 newProfileInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
@@ -573,6 +591,7 @@ settingsSaveButton.addEventListener('click', () => void saveSettings());
 scanModeToggle.addEventListener('click', () => {
   if (focusScan) exitFocusScan();
   else enterFocusScan();
+  savePreferences({ presentation: focusScan ? 'focus' : 'stack' });
 });
 scanPrevious.addEventListener('click', () => moveScanTarget(-1));
 scanNext.addEventListener('click', () => moveScanTarget(1));
@@ -604,12 +623,16 @@ results.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button || button.disabled) return;
   const section = button.closest('.engine-section');
-  if (section) void window.searchStack.navigate(section.dataset.viewKey, button.dataset.action);
+  if (section) void window.searchStack.navigate(section.dataset.viewKey, button.dataset.action).catch(error => setError(error.message));
 });
 
-window.searchStack.onProviders(makeProviderPicker);
+window.searchStack.onProviders((list) => { providers = list; if (currentSettings) makeProviderPicker(list); });
 window.searchStack.onSettings((nextSettings) => {
   currentSettings = nextSettings;
+  focusScan = currentSettings.presentation !== 'stack';
+  applyTheme();
+  makeProviderPicker(providers);
+  applyPresentation();
 });
 window.searchStack.onProviderStatus(({ viewKey, status, message }) => {
   const section = results.querySelector(`.engine-section[data-view-key="${CSS.escape(viewKey)}"]`);
@@ -619,22 +642,31 @@ window.searchStack.onProviderStatus(({ viewKey, status, message }) => {
     .find((button) => button.dataset.viewKey === viewKey);
   if (tab) tab.querySelector('.scan-tab-state').dataset.status = status;
   statusNode.dataset.status = status;
-  if (status === 'ready') {
-    statusNode.textContent = 'Live website';
-    section.querySelector('.engine-placeholder')?.remove();
-  } else if (status === 'error') statusNode.textContent = message || 'Could not load';
-  else statusNode.textContent = `Searching for “${currentQuery}”`;
+  const messages = { ready: 'Live website', loading: 'Loading…', slow: 'Taking longer than expected', stopped: 'Loading stopped' };
+  statusNode.textContent = message || messages[status] || status;
+  statusNode.title = statusNode.textContent;
+  section.querySelector('[data-action="stop"]').disabled = !['loading', 'slow'].includes(status);
+  const slot = section.querySelector('.provider-slot');
+  slot.replaceChildren();
+  if (['error', 'crashed', 'unresponsive'].includes(status)) {
+    const placeholder = document.createElement('div'); placeholder.className = 'engine-placeholder';
+    const text = document.createElement('p'); text.textContent = message || 'This page could not load. Other engines are still available.';
+    const retry = createNavigationButton('reload', 'Retry page', '↻');
+    placeholder.append(text, retry); slot.append(placeholder);
+  }
+  scheduleLayoutSync();
 });
-window.searchStack.onHistoryState(({ viewKey, canGoBack, canGoForward }) => {
+window.searchStack.onHistoryState(({ viewKey, url, canGoBack, canGoForward }) => {
   const section = results.querySelector(`.engine-section[data-view-key="${CSS.escape(viewKey)}"]`);
   if (!section) return;
+  const location = section.querySelector('.page-location');
+  try { location.textContent = new URL(url).hostname; location.title = url; } catch { location.textContent = ''; }
   section.querySelector('[data-action="back"]').disabled = !canGoBack;
   section.querySelector('[data-action="forward"]').disabled = !canGoForward;
 });
 window.searchStack.onScrollBy((deltaY) => window.scrollBy({ top: deltaY, behavior: 'auto' }));
 window.searchStack.onFocusSearch(() => {
-  queryInput.focus();
-  queryInput.select();
+  if (!settingsDialog.open) { queryInput.focus(); queryInput.select(); }
 });
 window.searchStack.onLayoutChanged(scheduleLayoutSync);
 
@@ -649,10 +681,44 @@ window.addEventListener('load', () => {
   scheduleLayoutSync();
 });
 
-document.addEventListener('keydown', (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-    event.preventDefault();
-    queryInput.focus();
-    queryInput.select();
-  }
+
+function editorProviders() { return [...providers.filter(p => !p.id.startsWith('custom-')), ...(workingSettings?.customEngines || [])]; }
+function applyTheme() {
+  const preference = workingSettings?.theme || currentSettings?.theme || 'system';
+  document.documentElement.dataset.theme = preference === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : preference;
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+document.querySelector('#theme').addEventListener('change', event => { workingSettings.theme = event.target.value; applyTheme(); });
+document.querySelector('#add-engine').addEventListener('click', () => {
+  const label = document.querySelector('#engine-name').value.trim();
+  const template = document.querySelector('#engine-url').value.trim();
+  try {
+    const url = new URL(template);
+    if (!label || label.length > 48 || /[\u0000-\u001f\u007f]/.test(label)) throw new Error('Enter an engine name, up to 48 characters.');
+    if (editorProviders().some(e => e.label.toLowerCase() === label.toLowerCase())) throw new Error('Engine names must be unique.');
+    if (workingSettings.customEngines.length >= 12) throw new Error('Add up to 12 custom engines.');
+    if (url.protocol !== 'https:' || url.username || url.password || template.split('{query}').length !== 2 || url.origin.includes('{query}') || url.hash.includes('{query}')) throw new Error('Use an HTTPS URL with one {query} in the path or query parameters.');
+    const id = `custom-${crypto.randomUUID()}`;
+    workingSettings.customEngines.push({ id, label, template });
+    workingSettings.engineProfiles[id] = ['default']; workingSettings.enabledEngines.push(id);
+    document.querySelector('#engine-name').value = ''; document.querySelector('#engine-url').value = '';
+    settingsNotice.textContent = 'Engine added. Save settings to use it.'; renderProfileMatrix();
+  } catch (error) { settingsNotice.textContent = error.message; }
 });
+window.searchStack.onCommand(command => {
+  if (command === 'settings') { void openSettings(); return; }
+  if (settingsDialog.open) return;
+  if (command === 'search') { queryInput.focus(); queryInput.select(); }
+  else if (command === 'next' || command === 'previous') {
+    const sections = resultSections(), index = sections.findIndex(s => s.dataset.viewKey === activeViewKey);
+    if (sections.length) selectScanTarget(sections[(index + (command === 'next' ? 1 : -1) + sections.length) % sections.length].dataset.viewKey, { jumpToSection: !focusScan });
+  } else if (command.startsWith('page-')) {
+    const section = resultSections()[Number(command.slice(5)) - 1];
+    if (section) selectScanTarget(section.dataset.viewKey, { jumpToSection: !focusScan });
+  } else if (command === 'layout') scanModeToggle.click();
+});
+if (window.searchStack.platform !== 'darwin') document.querySelectorAll('.mod').forEach(node => { node.textContent = 'Ctrl'; });
+
+function savePreferences(patch) {
+  void window.searchStack.savePreferences(patch).then(next => { currentSettings = next; }).catch(error => setError(error.message));
+}

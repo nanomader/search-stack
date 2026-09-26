@@ -1,6 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('searchStack', {
+  platform: process.platform,
+  savePreferences(patch) { return ipcRenderer.invoke('app:preferences', patch); },
+  setActivePage(key) { ipcRenderer.send('app:active-page', key); },
+  onCommand(callback) { ipcRenderer.on('app:command', (_event, command) => callback(command)); },
   search(query, providers) {
     return ipcRenderer.invoke('app:search', { query, providers });
   },

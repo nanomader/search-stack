@@ -10,9 +10,13 @@
     "start": "electron .",
     "package:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip",
     "package:win": "electron-builder --win nsis",
-    "package:linux": "electron-builder --linux AppImage deb"
+    "package:linux": "electron-builder --linux AppImage deb",
+    "test": "node --test tests/*.test.js",
+    "test:e2e": "playwright test",
+    "test:live": "node tests/live-smoke.js"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "electron": "44.4.5",
     "electron-builder": "26.15.3"
   },

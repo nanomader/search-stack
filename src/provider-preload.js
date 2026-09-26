@@ -1,4 +1,5 @@
 const { ipcRenderer } = require('electron');
+ipcRenderer.on('provider:ping', () => ipcRenderer.send('provider:pong'));
 
 function isSafeHttpsUrl(rawUrl) {
   try {
@@ -14,15 +15,10 @@ document.addEventListener('click', (event) => {
   const target = event.target instanceof Element ? event.target.closest('a[href]') : null;
   if (!target) return;
 
-  const rawHref = target.getAttribute('href')?.trim() || '';
   const opensSeparateContext = Boolean(target.target && target.target.toLowerCase() !== '_self');
-  const usesScriptUrl = /^\s*javascript:/i.test(rawHref);
-  if (usesScriptUrl) {
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    return;
-  }
+  // Same-page controls often use javascript:void(0) with a click listener.
+  // Let the website handle those in its existing sandbox. Actual document
+  // navigations and new windows remain restricted in the main process.
   if (!opensSeparateContext || target.hasAttribute('download')) return;
 
   event.preventDefault();

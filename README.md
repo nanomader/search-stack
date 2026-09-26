@@ -1,82 +1,133 @@
 # Search Stack
 
-Search Stack is a cross-platform desktop app for sending one query to several
-search engines and reading their live websites in a single vertical stack.
-Each result area is the engine's own page in its own browser session. Search
-Stack does not fetch results through a search API, parse result HTML, or proxy
-search traffic. A clicked result stays in its engine panel, with Back, Forward,
-and Reload controls beside the engine name.
+One query, several real search websites. Type and press Enter, then switch between
+full-size pages without reloading them or losing their scroll positions. Focus is
+the default; **Stack** restores the vertically scrollable comparison view.
 
-Use the vertical stack to browse pages in sequence, or switch to Focus scan to
-compare one full-size live page at a time. Its page switcher stays visible while
-you read, and switching engines keeps each page loaded at its own scroll position.
+The app's controls occupy 130 pixels above the page in Focus mode, with no sidebar
+or outer page margins. Back, Forward, Reload, Stop, and the current site's hostname
+remain accessible outside the website. Settings contain the less frequent choices.
 
-The first provider set is Google, Bing, Yahoo, and Baidu. You can switch each
-engine on or off before searching; changing the selection reruns the current
-query for the selected engines. Settings let you create named browser profiles
-and choose the profiles to search for each engine. Every engine and profile
-pair has its own persistent cookies and sign-in state, so Google can appear
-once signed in and once signed out in the same stack.
-To keep resource use bounded, up to 12 profiles can be saved and a search can
-show up to 12 engine and profile combinations at once.
+## Engines and independent sessions
 
-## Run locally
+Google, Bing, Yahoo, Baidu, DuckDuckGo, and Yandex are built in. Enable the engines
+you want on the start screen or in Settings. Add a custom engine with a name and
+an HTTPS search URL, for example `https://example.com/search?q={query}`. The query
+is encoded as data; exactly one `{query}` is required in the path or parameters.
+Up to 12 custom engines and 12 named profiles can be saved, with a maximum of 12
+engine/profile pages in a search.
 
-Install Node.js 24 or newer and npm, then run:
+To compare two Google sessions:
+
+1. Open **Settings** and add a profile such as **Personal**.
+2. Under Google, select both **Default** and **Personal**.
+3. Save and search. Each profile gets its own Google page.
+4. Sign in on the Personal page and leave Default signed out.
+
+Each engine/profile pair has its own persistent cookies, site storage, and cache.
+Existing profiles retain their identifiers and sessions when older settings are
+upgraded. A name like “Signed out” is a label, not an enforced private mode. The
+app does not import sign-ins from Chrome, Safari, or another browser. Removing a
+profile or custom engine asks for confirmation and clears its saved website data.
+Disabling an engine retains its data for later use.
+
+## Appearance and keyboard
+
+Settings offers **Day**, **Night**, and **System** themes. The saved preference also
+sets Chromium's preferred color scheme; individual websites decide how to use it
+and may retain their own theme. Theme changes preserve loaded pages. Engine
+selection and Focus/Stack preference are saved across restarts.
+
+Shortcuts work with focus in either the app or an embedded search page:
+
+| Action | macOS | Windows / Linux |
+| --- | --- | --- |
+| Focus/select search | Cmd L or Cmd K | Ctrl L or Ctrl K |
+| Next / previous engine page | Ctrl Tab / Ctrl Shift Tab | Ctrl Tab / Ctrl Shift Tab |
+| Jump to page 1–9 | Cmd 1–9 | Ctrl 1–9 |
+| Reload active page | Cmd R or F5 | Ctrl R or F5 |
+| Stop loading | Esc | Esc |
+| Back / forward | Alt Left / Right or Cmd [ / ] | Alt Left / Right or Ctrl [ / ] |
+| Settings | Cmd , | Ctrl , |
+| Focus / Stack | Cmd Shift S | Ctrl Shift S |
+
+The engine switcher also supports Left/Right arrow keys when a switch is focused.
+Native editing shortcuts and the application menu remain available.
+
+## Responsiveness and website boundaries
+
+The local UI and remote pages use separate sandboxed `WebContentsView` instances.
+Search requests start independently; switching engines reuses loaded pages. A slow
+network load gets a status after 15 seconds, with Stop and Reload still available.
+A lightweight ping checks the visible page's event loop: a frozen page is detected
+in roughly 8–12 seconds after it becomes visible. Reload recreates crashed, frozen,
+or slow views while retaining their session data (that recovery resets the page's
+navigation history). Hidden/minimized pages aren't polled for responsiveness.
+Inactive pages are destroyed when removed from the search.
+
+Queries go directly to the selected websites. Search Stack does not use a search
+API, scrape results, proxy traffic, or bypass consent and anti-abuse screens.
+“Live website” means the document loaded, not that search results are available.
+Providers can show regional, consent, sign-in, or CAPTCHA pages and may reject
+embedded-browser authentication. Actual account sign-in is not covered by the
+automated tests; persistent, isolated cookie storage is.
+
+Remote pages have Node integration disabled, context isolation and sandboxing
+enabled, and HTTPS-only document navigation. Pop-ups and non-HTTPS document
+navigations are blocked; same-page JavaScript controls still work inside the sandbox;
+ordinary HTTPS links that target a new tab open in the same engine panel.
+Downloads require a user gesture and the operating system's save dialog.
+
+## Run and test
+
+Use Node.js 24 or newer:
 
 ```sh
-npm install
+npm ci
 npm start
+npm test             # settings migration, input validation and query encoding
+npm run test:e2e     # complete Electron app with deterministic HTTPS fixtures
+npm run test:live    # opt-in network smoke test against all six real engines
 ```
 
-This app uses Electron and is intended to run on macOS, Windows, and Linux.
-The app is currently being developed on macOS; the Windows and Linux builds
-are configured below but still need hands-on verification on those systems.
+Both test commands that launch Electron use isolated temporary data directories,
+hidden windows, and a non-activating macOS application policy. They do not touch
+your normal sessions or take focus from your work. Linux needs a display server;
+for headless environments use `xvfb-run --auto-servernum npm run test:e2e`.
+
+The end-to-end suite exercises native views and IPC, full-size geometry and resize,
+page/scroll preservation, shortcuts from provider pages, result navigation and
+Back, settings overlays, day/night themes, custom URLs, two Google profiles,
+cookie isolation across restart, deletion cancellation/confirmation, failed and
+stopped loads, renderer crashes, an infinite-loop website, unsafe navigation,
+blocked pop-ups, and removal of inactive views. Only the external HTTPS servers
+and native deletion-confirmation answers are substituted in the deterministic
+suite; the app's production navigation, settings, session, and recovery code runs.
+Screenshots and failure traces go under `output/playwright/` (ignored by Git).
+
+The live smoke records provider URLs, titles, short page text, and screenshots in
+`output/playwright/live/`. It never signs in or answers CAPTCHA/consent prompts.
+Network results vary; review the recorded pages instead of counting every loaded
+document as a successful search. Local captures can contain network identifiers
+shown by providers, so review them before sharing.
 
 ## Build installers
 
-Run the matching command on each target operating system:
+Run on the target operating system:
 
 ```sh
-npm run package:mac    # macOS .dmg and .zip
+npm run package:mac    # macOS DMG and ZIP
 npm run package:win    # Windows NSIS installer
-npm run package:linux  # Linux AppImage and .deb
+npm run package:linux  # Linux AppImage and deb
 ```
 
-The GitHub Actions workflow builds each platform on its native runner and
-stores the installers as workflow artifacts.
+GitHub Actions runs unit and Electron end-to-end tests before packaging on native
+macOS, Windows, and Linux runners. The workflow is configured locally; it has not
+been dispatched by this change. macOS is locally tested. Windows and Linux still
+need native verification. The local macOS package is unsigned and unnotarized.
 
-## How the stacked pages work
-
-Electron's `BaseWindow` composes one local app view with separate
-`WebContentsView` instances for the selected search sites. The app scrolls the
-native page views with their matching result sections. A small isolated
-preload listens for wheel input only at the top or bottom of a provider page
-and relays it to the app, so normal scrolling first moves through that site's
-results and then continues to the next engine.
-
-Queries go directly from the device to the selected search sites. Each engine
-and named profile pair has its own persistent browser session for cookies,
-sign-in state, and consent preferences. Creating a profile does not sign in
-automatically; use the engine's real website in that profile. Removing a
-profile requires confirmation and clears its saved website data.
-Web pages may show consent, regional, sign-in, or anti-abuse screens, and
-availability or behavior can vary by country and provider policy. Search Stack
-does not bypass those screens or access controls.
-
-Provider pages run with Node integration disabled, context isolation, sandboxing,
-and HTTPS-only navigation. Pop-up windows and non-HTTPS links are blocked. Links
-that normally open a new tab load in their current engine panel instead. A
-download requires the operating system's save dialog.
-
-## Project status
-
-This is an early prototype. Provider pages can change without notice, and
-providers may limit use in embedded browser surfaces. The current goal is to
-validate whether their unmodified websites can be displayed and scrolled
-reliably across desktop operating systems.
+See [VALIDATION.md](VALIDATION.md) for the current verification record.
 
 ## License
 
-MIT. Search Stack is an independent project and is not affiliated with the
-search providers.
+MIT. Search Stack is independent and is not affiliated with the search providers.
