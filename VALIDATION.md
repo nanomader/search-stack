@@ -10,7 +10,7 @@ All five unit tests and seven full-app scenarios passed locally.
 
 The code-cleanup pass reran the same suite before and after refactoring, with all
 checks passing in hidden windows. Formatting is pinned with Prettier and checked
-by `npm run format:check`, locally and in CI. Functional changes were reviewed
+by `npm run format:check`. The former CI workflow also ran this check. Functional changes were reviewed
 separately from formatting: shared IPC authorization/subscription helpers, session
 cleanup, view hiding, scroll transitions, and repeated UI lookups preserve the
 existing behavior. No test assertions were removed or weakened.
@@ -37,7 +37,45 @@ existing behavior. No test assertions were removed or weakened.
 - A regression test also reproduces and covers the inherited interception of
   JavaScript-based website controls. Same-page controls now work within the
   existing sandbox; unsafe document navigation and pop-ups stay blocked.
-- Native Windows/Linux test jobs are configured but have not run locally.
+- The first GitHub Actions run for `3e1bfa9` passed all five unit tests and all seven
+  Electron scenarios on both macOS ARM64 and Linux x64. Windows stopped at the
+  formatting check before running tests; its checkout used different line endings.
+
+## Public-preview preparation
+
+[The first CI run](https://github.com/nanomader/search-stack/actions/runs/36246363987)
+failed overall despite the passing macOS/Linux tests:
+
+- macOS produced the DMG and ZIP, then failed when electron-builder attempted an
+  implicit CI upload without a GitHub publishing token. Packaging commands now
+  explicitly use `--publish never`. A local `CI=true` macOS package run completed
+  successfully with the corrected command and a separate `dist/public-preview/`
+  output directory.
+- Windows formatting failed on checkout line endings. `.gitattributes` now enforces
+  LF for text. Formatting passed in a disposable checkout with `core.autocrlf=true`.
+  A fresh native Windows check is still required before a Windows release.
+- Linux passed the Electron suite and built AppImage, then failed on the .deb
+  target because a public maintainer email was missing. The first Linux download
+  format remains a release decision; no email has been invented or disclosed.
+
+The README's Day/Night screenshots were captured from live Bing and DuckDuckGo
+pages in hidden, isolated windows. Local documentation links and image paths were
+checked. No public release or Homebrew package has been published by this
+preparation pass.
+
+## Local build policy and hosted-cost prevention
+
+The user requires a release process without paid build infrastructure. The remote
+`Build desktop app` workflow was disabled and its state verified as
+`disabled_manually`. No runs were active, and the repository had zero Actions
+artifacts at the time of inspection. The local workflow file has been removed.
+The earlier hosted run remains historical usage; no claim is made about its
+billing impact.
+
+Use `npm run verify` and the local packaging commands for future releases. Upload
+finished installers to GitHub Releases manually. Native Windows/Intel Mac checks
+are deferred until suitable existing hardware is available; no paid runner or
+cloud machine is required by the distribution plan.
 
 ## Real websites
 
@@ -82,5 +120,25 @@ Evidence: `output/playwright/packaged-split.json` (excluded from Git).
 
 These tests establish the covered application behaviors on this Mac, not universal
 provider availability or native Windows/Linux support. They do not establish
-behavior under every memory-pressure, network, or OS failure. macOS packaging is
-unsigned/unnotarized; signing and distribution are outside this change.
+behavior under every memory-pressure, network, or OS failure. The macOS preview is ad-hoc signed and not notarized. A clean-account Gatekeeper
+launch, Intel Mac, and native Windows release qualification remain unverified.
+
+## First public preview (0.1.0)
+
+The release preparation passed formatting, all five unit tests, and all seven
+hidden-window Electron end-to-end scenarios. The same seven scenarios also passed
+against the actual ARM64 release executable with `app.isPackaged` asserted.
+Every test used temporary session data; the running user application was preserved.
+
+The older unsigned bundle failed strict signature verification. The release build
+uses free ad-hoc signing and passes `codesign --verify --deep --strict`. This is
+bundle-integrity evidence, not Developer ID signing or Apple notarization.
+
+Artifacts were built locally into `dist/release-0.1.0` with publishing disabled:
+
+- DMG SHA-256: `fadd8f72faf1060c992fda81d1f4ebf80514fcc12603e9a8a57eb22f8f283981`
+- ZIP SHA-256: `02d521859b732e6afb918a41f425f800070249bf0661e6b305d0e59323cf8755`
+
+GitHub Actions was disabled for the entire source repository, beyond disabling
+the old workflow. The README uses real Day/Night app captures and a clearly
+separate generated hamster illustration.

@@ -6,10 +6,17 @@ const { DEFAULT_SETTINGS } = require('../src/settings');
 let application, page, dataDir;
 const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
 async function launch() {
+  const executablePath = process.env.SEARCH_STACK_EXECUTABLE;
   application = await electron.launch({
-    args: [path.join(__dirname, '..'), '--background-test', `--user-data-dir=${dataDir}`],
+    executablePath,
+    args: [
+      ...(executablePath ? [] : [path.join(__dirname, '..')]),
+      '--background-test',
+      `--user-data-dir=${dataDir}`,
+    ],
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '' },
   });
+  if (executablePath) expect(await application.evaluate(({ app }) => app.isPackaged)).toBe(true);
   page = await application.firstWindow();
   expect(
     await application.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].isVisible()),

@@ -1,7 +1,12 @@
 {
   "name": "search-stack",
   "version": "0.1.0",
-  "description": "Search several live search engines in one vertically scrollable desktop view.",
+  "description": "Compare live search engines side by side in a simple desktop app.",
+  "homepage": "https://github.com/nanomader/search-stack",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nanomader/search-stack.git"
+  },
   "main": "src/main.js",
   "author": "Search Stack contributors",
   "private": true,
@@ -9,10 +14,11 @@
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "verify": "npm run format:check && npm test && npm run test:e2e",
     "start": "electron .",
-    "package:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip",
-    "package:win": "electron-builder --win nsis",
-    "package:linux": "electron-builder --linux AppImage deb",
+    "package:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --publish never",
+    "package:win": "electron-builder --win nsis --publish never",
+    "package:linux": "electron-builder --linux AppImage deb --publish never",
     "test": "node --test tests/*.test.js",
     "test:e2e": "playwright test",
     "test:live": "node tests/live-smoke.js"
@@ -36,6 +42,10 @@
     "asar": true,
     "mac": {
       "category": "public.app-category.productivity",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "notarize": false,
+      "artifactName": "Search-Stack-${version}-${arch}.${ext}",
       "target": [
         "dmg",
         "zip"
