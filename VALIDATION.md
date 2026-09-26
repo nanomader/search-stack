@@ -294,3 +294,10 @@ Strict signatures and Gatekeeper assessments passed for both extracted formats.
 
 - DMG: `2e7678edd92cc1d4037b6b8b6952d8e66ea4eb7b289d5e4ec949f2483afd7720`
 - ZIP: `5e821393ed1a7a9a4fc9a94fca021e00972efcd799070223fd5e4781bc3e9919`
+
+GitHub's uploaded digests match the final artifacts. Homebrew upgraded the closed
+0.1.2 installation to 0.1.3. The installed app passed strict signatures and
+Gatekeeper, reopened normally in the background, and retained quarantine. All
+seven installed-app scenarios passed (18.3 seconds). Its packaged main process
+matches the committed Dock fix. Visual confirmation of the Dock was requested
+from the user; these automated results do not substitute for that observation.
