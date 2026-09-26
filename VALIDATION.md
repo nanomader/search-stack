@@ -270,3 +270,27 @@ profile, followed by all seven installed-app scenarios (17.4 seconds) and the
 hidden logo check. The installed native icon matches the verified release.
 Quarantine remains present, and Gatekeeper accepts the installed app without an
 override. Both repositories still have GitHub Actions disabled.
+
+## macOS running Dock icon fix (0.1.3)
+
+The user observed Electron's icon in the Dock while the installed 0.1.2 app was
+running. Its bundle already referenced the correct hamster `.icns`; the previous
+bundle/header checks did not establish what the Dock displayed. A stale icon
+cache is a possible cause, not a confirmed diagnosis.
+
+The app now explicitly sets the macOS Dock icon from the packaged hamster PNG
+at startup. Other platforms keep their existing behavior. Formatting, five unit
+tests, and all seven source end-to-end scenarios passed. The packaged source and
+artwork were byte-compared with the working tree.
+
+Direct Dock screenshot capture was unavailable because Screen Recording
+permission was not granted. Visible Dock verification must be recorded separately
+from hidden-window tests.
+
+All seven scenarios also passed against the signed packaged app (19.8 seconds).
+Apple accepted submission `e2161b65-f029-41b4-a8f4-b49049db44f8`. Stapling and
+validation passed for the DMG and app; the ZIP was recreated from that app.
+Strict signatures and Gatekeeper assessments passed for both extracted formats.
+
+- DMG: `2e7678edd92cc1d4037b6b8b6952d8e66ea4eb7b289d5e4ec949f2483afd7720`
+- ZIP: `5e821393ed1a7a9a4fc9a94fca021e00972efcd799070223fd5e4781bc3e9919`

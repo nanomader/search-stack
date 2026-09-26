@@ -41,7 +41,7 @@ Prefer the lights low?
 brew install --cask nanomader/tap/search-stack
 ```
 
-Or [download the Mac app](https://github.com/nanomader/search-stack/releases/tag/v0.1.2)
+Or [download the Mac app](https://github.com/nanomader/search-stack/releases/tag/v0.1.3)
 and drag it into Applications. Open **Search Stack**, type a query, and press Enter.
 
 **Signed and Apple-notarized.** No security workaround or developer tools needed.

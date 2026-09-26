@@ -669,6 +669,9 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // Set the running Dock icon explicitly; macOS may retain Electron's cached icon
+  // after upgrading an installation that previously used the default artwork.
+  if (process.platform === 'darwin') app.dock.setIcon(path.join(__dirname, 'icon.png'));
   await loadSettings();
   refreshProviders();
   nativeTheme.themeSource = settings.theme;
