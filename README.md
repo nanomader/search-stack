@@ -52,16 +52,16 @@ selection and Focus/Split/Stack preference are saved across restarts.
 
 Shortcuts work with focus in either the app or an embedded search page:
 
-| Action | macOS | Windows / Linux |
-| --- | --- | --- |
-| Focus/select search | Cmd L or Cmd K | Ctrl L or Ctrl K |
-| Next / previous engine page | Ctrl Tab / Ctrl Shift Tab | Ctrl Tab / Ctrl Shift Tab |
-| Jump to page 1–9 | Cmd 1–9 | Ctrl 1–9 |
-| Reload active page | Cmd R or F5 | Ctrl R or F5 |
-| Stop loading | Esc | Esc |
-| Back / forward | Alt Left / Right or Cmd [ / ] | Alt Left / Right or Ctrl [ / ] |
-| Settings | Cmd , | Ctrl , |
-| Focus / Stack | Cmd Shift S | Ctrl Shift S |
+| Action                      | macOS                         | Windows / Linux                |
+| --------------------------- | ----------------------------- | ------------------------------ |
+| Focus/select search         | Cmd L or Cmd K                | Ctrl L or Ctrl K               |
+| Next / previous engine page | Ctrl Tab / Ctrl Shift Tab     | Ctrl Tab / Ctrl Shift Tab      |
+| Jump to page 1–9            | Cmd 1–9                       | Ctrl 1–9                       |
+| Reload active page          | Cmd R or F5                   | Ctrl R or F5                   |
+| Stop loading                | Esc                           | Esc                            |
+| Back / forward              | Alt Left / Right or Cmd [ / ] | Alt Left / Right or Ctrl [ / ] |
+| Settings                    | Cmd ,                         | Ctrl ,                         |
+| Focus / Stack               | Cmd Shift S                   | Ctrl Shift S                   |
 
 The engine switcher also supports Left/Right arrow keys when a switch is focused.
 Native editing shortcuts and the application menu remain available.
@@ -97,6 +97,8 @@ Use Node.js 24 or newer:
 ```sh
 npm ci
 npm start
+npm run format:check # check consistent source, test and documentation formatting
+npm run format       # apply formatting
 npm test             # settings migration, input validation and query encoding
 npm run test:e2e     # complete Electron app with deterministic HTTPS fixtures
 npm run test:live    # opt-in network smoke test against all six real engines
@@ -134,10 +136,10 @@ npm run package:win    # Windows NSIS installer
 npm run package:linux  # Linux AppImage and deb
 ```
 
-GitHub Actions runs unit and Electron end-to-end tests before packaging on native
-macOS, Windows, and Linux runners. The workflow is configured locally; it has not
-been dispatched by this change. macOS is locally tested. Windows and Linux still
-need native verification. The local macOS package is unsigned and unnotarized.
+GitHub Actions checks formatting and runs unit and Electron end-to-end tests before
+packaging on native macOS, Windows, and Linux runners. Check the workflow results
+for the commit you use; the local verification record covers macOS. The local
+macOS package is unsigned and unnotarized.
 
 See [VALIDATION.md](VALIDATION.md) for the current verification record.
 

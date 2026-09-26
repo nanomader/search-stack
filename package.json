@@ -7,6 +7,8 @@
   "private": true,
   "license": "MIT",
   "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "start": "electron .",
     "package:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip",
     "package:win": "electron-builder --win nsis",
@@ -18,7 +20,8 @@
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "electron": "44.4.5",
-    "electron-builder": "26.15.3"
+    "electron-builder": "26.15.3",
+    "prettier": "3.9.9"
   },
   "build": {
     "appId": "dev.searchstack.app",

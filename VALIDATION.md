@@ -8,6 +8,13 @@ existing Search Stack sessions. Subsequent automation runs use hidden windows.
 
 All five unit tests and seven full-app scenarios passed locally.
 
+The code-cleanup pass reran the same suite before and after refactoring, with all
+checks passing in hidden windows. Formatting is pinned with Prettier and checked
+by `npm run format:check`, locally and in CI. Functional changes were reviewed
+separately from formatting: shared IPC authorization/subscription helpers, session
+cleanup, view hiding, scroll transitions, and repeated UI lookups preserve the
+existing behavior. No test assertions were removed or weakened.
+
 - `npm test`: migration of legacy settings, stable profile identifiers, query
   encoding, template URL restrictions, profile/engine validation, split preference
   migration and validation.
@@ -38,14 +45,14 @@ A real network run sent `Electron WebContentsView documentation` to all six
 engines. No fixture interception, account login, consent acceptance, or CAPTCHA
 interaction was used. The native window was also visually inspected on macOS.
 
-| Provider | Observed outcome |
-| --- | --- |
-| Google | Unusual-traffic CAPTCHA, not search results |
-| Bing | Search results |
-| Yahoo | Search results with a privacy notice |
-| Baidu | Search results |
-| DuckDuckGo | Search results |
-| Yandex | Anti-bot challenge, not search results |
+| Provider   | Observed outcome                            |
+| ---------- | ------------------------------------------- |
+| Google     | Unusual-traffic CAPTCHA, not search results |
+| Bing       | Search results                              |
+| Yahoo      | Search results with a privacy notice        |
+| Baidu      | Search results                              |
+| DuckDuckGo | Search results                              |
+| Yandex     | Anti-bot challenge, not search results      |
 
 The app remained usable across all six pages. Live engine switching checks waited
 for the corresponding native view to become visible, not just the highlighted

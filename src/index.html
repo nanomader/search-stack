@@ -1,84 +1,225 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <title>Search Stack</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body data-presentation="focus">
-  <header class="topbar">
-    <span class="brand" title="Search Stack" aria-label="Search Stack">S<span>Search Stack</span></span>
-    <form id="search-form" class="search-form">
-      <label class="visually-hidden" for="query">Search query</label>
-      <span class="search-icon" aria-hidden="true">⌕</span>
-      <input id="query" name="query" type="search" placeholder="Search once. Compare across engines." autocomplete="off" maxlength="2048" required autofocus>
-      <button id="search-button" type="submit" title="Search selected engines (Enter)">Search ↵</button>
-    </form>
-    <button id="settings-button" class="icon-button" type="button" aria-label="Settings" title="Engines, profiles & appearance" aria-haspopup="dialog" aria-controls="settings-dialog">⚙</button>
-  </header>
-  <main class="page-shell">
-    <p id="app-notice" class="error-message" role="status" hidden></p>
-    <section id="results" class="results" aria-label="Search engine results">
-      <nav id="scan-toolbar" class="scan-toolbar" aria-label="Compare search pages" hidden>
-        <button id="scan-previous" class="icon-button" type="button" aria-label="Previous search page" title="Previous page (Ctrl+Shift+Tab)">‹</button>
-        <div id="scan-tabs" class="scan-tabs" role="group" aria-label="Jump between search pages"></div>
-        <button id="scan-next" class="icon-button" type="button" aria-label="Next search page" title="Next page (Ctrl+Tab)">›</button>
-        <span id="scan-counter" class="scan-counter" aria-live="polite"></span>
-        <div id="split-controls" hidden>
-          <label class="split-choice" id="left-choice"><span>Left</span><select id="split-left" aria-label="Left search page"></select></label>
-          <button id="split-swap" class="icon-button" type="button" aria-label="Swap comparison sides" title="Swap left and right">⇄</button>
-          <label class="split-choice" id="right-choice"><span>Right</span><select id="split-right" aria-label="Right search page"></select></label>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Search Stack</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-presentation="focus">
+    <header class="topbar">
+      <span class="brand" title="Search Stack" aria-label="Search Stack"
+        >S<span>Search Stack</span></span
+      >
+      <form id="search-form" class="search-form">
+        <label class="visually-hidden" for="query">Search query</label>
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input
+          id="query"
+          name="query"
+          type="search"
+          placeholder="Search once. Compare across engines."
+          autocomplete="off"
+          maxlength="2048"
+          required
+          autofocus
+        />
+        <button id="search-button" type="submit" title="Search selected engines (Enter)">
+          Search ↵
+        </button>
+      </form>
+      <button
+        id="settings-button"
+        class="icon-button"
+        type="button"
+        aria-label="Settings"
+        title="Engines, profiles & appearance"
+        aria-haspopup="dialog"
+        aria-controls="settings-dialog"
+      >
+        ⚙
+      </button>
+    </header>
+    <main class="page-shell">
+      <p id="app-notice" class="error-message" role="status" hidden></p>
+      <section id="results" class="results" aria-label="Search engine results">
+        <nav id="scan-toolbar" class="scan-toolbar" aria-label="Compare search pages" hidden>
+          <button
+            id="scan-previous"
+            class="icon-button"
+            type="button"
+            aria-label="Previous search page"
+            title="Previous page (Ctrl+Shift+Tab)"
+          >
+            ‹
+          </button>
+          <div
+            id="scan-tabs"
+            class="scan-tabs"
+            role="group"
+            aria-label="Jump between search pages"
+          ></div>
+          <button
+            id="scan-next"
+            class="icon-button"
+            type="button"
+            aria-label="Next search page"
+            title="Next page (Ctrl+Tab)"
+          >
+            ›
+          </button>
+          <span id="scan-counter" class="scan-counter" aria-live="polite"></span>
+          <div id="split-controls" hidden>
+            <label class="split-choice" id="left-choice"
+              ><span>Left</span
+              ><select id="split-left" aria-label="Left search page"></select
+            ></label>
+            <button
+              id="split-swap"
+              class="icon-button"
+              type="button"
+              aria-label="Swap comparison sides"
+              title="Swap left and right"
+            >
+              ⇄
+            </button>
+            <label class="split-choice" id="right-choice"
+              ><span>Right</span
+              ><select id="split-right" aria-label="Right search page"></select
+            ></label>
+          </div>
+          <button
+            id="split-toggle"
+            class="scan-mode-toggle"
+            type="button"
+            aria-pressed="false"
+            title="Compare two pages side by side"
+          >
+            ◫ Split
+          </button>
+          <button id="scan-mode-toggle" class="scan-mode-toggle" type="button" aria-pressed="true">
+            Stack
+          </button>
+        </nav>
+        <div id="empty-state" class="empty-state">
+          <span class="empty-mark" aria-hidden="true">⌕</span>
+          <h1>One search. More perspectives.</h1>
+          <p>
+            Type above and press Enter. Switch between full-size search pages without losing your
+            place.
+          </p>
+          <div id="engine-picker" class="engine-picker" aria-label="Search engines"></div>
+          <p class="subtle">
+            Choose engines here. Add engines and independent sign-in profiles in Settings.
+          </p>
+          <div class="shortcut-hints">
+            <span><kbd class="mod">⌘</kbd><kbd>L</kbd> Search</span
+            ><span><kbd>Ctrl</kbd><kbd>Tab</kbd> Next page</span
+            ><span><kbd class="mod">⌘</kbd><kbd>1–9</kbd> Jump to page</span>
+          </div>
         </div>
-        <button id="split-toggle" class="scan-mode-toggle" type="button" aria-pressed="false" title="Compare two pages side by side">◫ Split</button>
-        <button id="scan-mode-toggle" class="scan-mode-toggle" type="button" aria-pressed="true">Stack</button>
-      </nav>
-      <div id="empty-state" class="empty-state">
-        <span class="empty-mark" aria-hidden="true">⌕</span>
-        <h1>One search. More perspectives.</h1>
-        <p>Type above and press Enter. Switch between full-size search pages without losing your place.</p>
-        <div id="engine-picker" class="engine-picker" aria-label="Search engines"></div>
-        <p class="subtle">Choose engines here. Add engines and independent sign-in profiles in Settings.</p>
-        <div class="shortcut-hints"><span><kbd class="mod">⌘</kbd><kbd>L</kbd> Search</span><span><kbd>Ctrl</kbd><kbd>Tab</kbd> Next page</span><span><kbd class="mod">⌘</kbd><kbd>1–9</kbd> Jump to page</span></div>
-      </div>
-    </section>
-  </main>
-  <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
-    <form id="settings-form" method="dialog">
-      <div class="settings-title-row"><h2 id="settings-title">Make it yours</h2><button id="settings-close" class="icon-button" type="button" aria-label="Close settings">×</button></div>
-      <section class="settings-section">
-        <h3>Appearance</h3>
-        <div class="setting-line"><label for="theme">Theme</label><select id="theme"><option value="system">System</option><option value="light">Day</option><option value="dark">Night</option></select></div>
-        <p class="settings-help">Websites follow this preference where supported; their own appearance settings still apply.</p>
       </section>
-      <section class="settings-section">
-        <h3>Engines & sessions</h3>
-        <p class="settings-help">Enable an engine, then choose its profiles. Each checked profile opens a separate page. Up to 12 pages per search.</p>
-        <div id="profile-matrix" class="profile-matrix"></div>
-      </section>
-      <section class="settings-section">
-        <h3>Add a search engine</h3>
-        <p class="settings-help">Use its HTTPS search URL, replacing the search phrase with {query}.</p>
-        <div class="custom-engine-form">
-          <label for="engine-name">Name</label><input id="engine-name" maxlength="48" placeholder="My search engine">
-          <label for="engine-url">Search URL</label><input id="engine-url" type="url" placeholder="https://example.com/search?q={query}" maxlength="2048">
-          <button id="add-engine" class="secondary-button" type="button">Add engine</button>
+    </main>
+    <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+      <form id="settings-form" method="dialog">
+        <div class="settings-title-row">
+          <h2 id="settings-title">Make it yours</h2>
+          <button id="settings-close" class="icon-button" type="button" aria-label="Close settings">
+            ×
+          </button>
         </div>
-      </section>
-      <section class="settings-section">
-        <h3>Browser profiles</h3>
-        <p class="settings-help">Add “Personal” or “Signed out” and select it under an engine above. Sign in on that engine’s website. Cookies persist across restarts and are separate from your regular browser. A profile name does not enforce a signed-out state.</p>
-        <div id="profile-list" class="profile-list"></div>
-        <div class="new-profile-row"><label class="visually-hidden" for="new-profile-name">New profile name</label><input id="new-profile-name" maxlength="48" placeholder="New profile name"><button id="add-profile-button" class="secondary-button" type="button">Add profile</button></div>
-      </section>
-      <details class="settings-section"><summary>Keyboard shortcuts</summary>
-        <dl class="shortcuts"><dt>Focus search</dt><dd><span class="mod">⌘</span> L / K</dd><dt>Next / previous page</dt><dd>Ctrl Tab / Ctrl Shift Tab</dd><dt>Jump to page 1–9</dt><dd><span class="mod">⌘</span> 1–9</dd><dt>Reload page</dt><dd><span class="mod">⌘</span> R / F5</dd><dt>Stop loading</dt><dd>Esc</dd><dt>Back / forward</dt><dd>Alt ← / →</dd><dt>Settings</dt><dd><span class="mod">⌘</span> ,</dd><dt>Focus / stack</dt><dd><span class="mod">⌘</span> Shift S</dd></dl>
-      </details>
-      <p id="settings-notice" class="settings-notice" role="status"></p>
-      <div class="settings-actions"><button id="settings-cancel" class="secondary-button" type="button">Cancel</button><button id="settings-save" class="primary-button" type="button">Save settings</button></div>
-    </form>
-  </dialog>
-  <script src="renderer.js"></script>
-</body>
+        <section class="settings-section">
+          <h3>Appearance</h3>
+          <div class="setting-line">
+            <label for="theme">Theme</label
+            ><select id="theme">
+              <option value="system">System</option>
+              <option value="light">Day</option>
+              <option value="dark">Night</option>
+            </select>
+          </div>
+          <p class="settings-help">
+            Websites follow this preference where supported; their own appearance settings still
+            apply.
+          </p>
+        </section>
+        <section class="settings-section">
+          <h3>Engines & sessions</h3>
+          <p class="settings-help">
+            Enable an engine, then choose its profiles. Each checked profile opens a separate page.
+            Up to 12 pages per search.
+          </p>
+          <div id="profile-matrix" class="profile-matrix"></div>
+        </section>
+        <section class="settings-section">
+          <h3>Add a search engine</h3>
+          <p class="settings-help">
+            Use its HTTPS search URL, replacing the search phrase with {query}.
+          </p>
+          <div class="custom-engine-form">
+            <label for="engine-name">Name</label
+            ><input id="engine-name" maxlength="48" placeholder="My search engine" />
+            <label for="engine-url">Search URL</label
+            ><input
+              id="engine-url"
+              type="url"
+              placeholder="https://example.com/search?q={query}"
+              maxlength="2048"
+            />
+            <button id="add-engine" class="secondary-button" type="button">Add engine</button>
+          </div>
+        </section>
+        <section class="settings-section">
+          <h3>Browser profiles</h3>
+          <p class="settings-help">
+            Add “Personal” or “Signed out” and select it under an engine above. Sign in on that
+            engine’s website. Cookies persist across restarts and are separate from your regular
+            browser. A profile name does not enforce a signed-out state.
+          </p>
+          <div id="profile-list" class="profile-list"></div>
+          <div class="new-profile-row">
+            <label class="visually-hidden" for="new-profile-name">New profile name</label
+            ><input id="new-profile-name" maxlength="48" placeholder="New profile name" /><button
+              id="add-profile-button"
+              class="secondary-button"
+              type="button"
+            >
+              Add profile
+            </button>
+          </div>
+        </section>
+        <details class="settings-section">
+          <summary>Keyboard shortcuts</summary>
+          <dl class="shortcuts">
+            <dt>Focus search</dt>
+            <dd><span class="mod">⌘</span> L / K</dd>
+            <dt>Next / previous page</dt>
+            <dd>Ctrl Tab / Ctrl Shift Tab</dd>
+            <dt>Jump to page 1–9</dt>
+            <dd><span class="mod">⌘</span> 1–9</dd>
+            <dt>Reload page</dt>
+            <dd><span class="mod">⌘</span> R / F5</dd>
+            <dt>Stop loading</dt>
+            <dd>Esc</dd>
+            <dt>Back / forward</dt>
+            <dd>Alt ← / →</dd>
+            <dt>Settings</dt>
+            <dd><span class="mod">⌘</span> ,</dd>
+            <dt>Focus / stack</dt>
+            <dd><span class="mod">⌘</span> Shift S</dd>
+          </dl>
+        </details>
+        <p id="settings-notice" class="settings-notice" role="status"></p>
+        <div class="settings-actions">
+          <button id="settings-cancel" class="secondary-button" type="button">Cancel</button
+          ><button id="settings-save" class="primary-button" type="button">Save settings</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="renderer.js"></script>
+  </body>
 </html>

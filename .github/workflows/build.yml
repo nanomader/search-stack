@@ -27,6 +27,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run format:check
       - run: npm test
       - name: Test Electron (macOS and Windows)
         if: runner.os != 'Linux'

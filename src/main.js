@@ -25,9 +25,18 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-const { DEFAULT_SETTINGS, MAX_ACTIVE_PAGES, validateSettings, enginesFor, searchUrl, isSafeHttpsUrl } = require('./settings');
+const {
+  DEFAULT_SETTINGS,
+  MAX_ACTIVE_PAGES,
+  validateSettings,
+  enginesFor,
+  searchUrl,
+  isSafeHttpsUrl,
+} = require('./settings');
 let PROVIDERS = {};
-function refreshProviders() { PROVIDERS = Object.fromEntries(enginesFor(settings).map(e => [e.id, e])); }
+function refreshProviders() {
+  PROVIDERS = Object.fromEntries(enginesFor(settings).map((e) => [e.id, e]));
+}
 
 const backgroundTest = app.commandLine.hasSwitch('background-test');
 const providerViews = new Map();
@@ -53,18 +62,15 @@ const assetFiles = new Map([
   ['/renderer.js', 'renderer.js'],
 ]);
 
-function cloneSettings(value) {
-  return structuredClone(value);
-}
-
 async function loadSettings() {
   const settingsPath = path.join(app.getPath('userData'), 'settings.json');
   try {
     const contents = await fs.readFile(settingsPath, 'utf8');
     settings = validateSettings(JSON.parse(contents));
   } catch (error) {
-    if (error.code !== 'ENOENT') console.warn('Using default Search Stack settings:', error.message);
-    settings = cloneSettings(DEFAULT_SETTINGS);
+    if (error.code !== 'ENOENT')
+      console.warn('Using default Search Stack settings:', error.message);
+    settings = structuredClone(DEFAULT_SETTINGS);
   }
 }
 
@@ -119,7 +125,8 @@ function sendToApp(channel, payload) {
 
 function sendStatus(state, status, details = {}) {
   state.status = status;
-  if (['ready', 'error', 'crashed', 'stopped', 'unresponsive'].includes(status)) clearTimeout(state.loadTimer);
+  if (['ready', 'error', 'crashed', 'stopped', 'unresponsive'].includes(status))
+    clearTimeout(state.loadTimer);
   if (state.generation !== searchGeneration || !currentViewKeys.has(state.key)) return;
   sendToApp('app:provider-status', {
     providerId: state.providerId,
@@ -141,7 +148,9 @@ function sendHistoryState(state) {
 }
 
 function safeDownloadName(name) {
-  const cleaned = String(name || 'download').replace(/[\\/\u0000-\u001f\u007f]/g, '_').trim();
+  const cleaned = String(name || 'download')
+    .replace(/[\\/\u0000-\u001f\u007f]/g, '_')
+    .trim();
   return (cleaned || 'download').slice(0, 180);
 }
 
@@ -160,15 +169,21 @@ function installProviderSession(providerId, profileId, providerSession) {
   if (installedProviderSessions.has(partition)) return;
   installedProviderSessions.add(partition);
 
-  providerSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+  providerSession.setPermissionRequestHandler((_webContents, _permission, callback) =>
+    callback(false),
+  );
   providerSession.setPermissionCheckHandler(() => false);
   providerSession.on('will-download', (_event, item, contents) => {
     const state = findProviderState(contents);
     const downloadUrls = item.getURLChain();
-    if (!state || !currentViewKeys.has(state.key) || !item.hasUserGesture()
-      || !isSafeHttpsUrl(item.getInitiatorOrigin())
-      || downloadUrls.length === 0
-      || downloadUrls.some((url) => !isSafeDownloadUrl(url))) {
+    if (
+      !state ||
+      !currentViewKeys.has(state.key) ||
+      !item.hasUserGesture() ||
+      !isSafeHttpsUrl(item.getInitiatorOrigin()) ||
+      downloadUrls.length === 0 ||
+      downloadUrls.some((url) => !isSafeDownloadUrl(url))
+    ) {
       item.cancel();
       return;
     }
@@ -200,18 +215,35 @@ function createProviderView(providerId, profileId) {
   view.setVisible(false);
 
   const key = viewKey(providerId, profileId);
-  const state = { view, key, providerId, profileId, generation: 0, status: 'loading', lastUrl: '', loadTimer: null };
+  const state = {
+    view,
+    key,
+    providerId,
+    profileId,
+    generation: 0,
+    status: 'loading',
+    lastUrl: '',
+    loadTimer: null,
+  };
   providerViews.set(key, state);
   // Electron's native 'unresponsive' event is not reliable for every composed
   // view. A ping to the isolated preload checks the visible page's event loop.
   state.healthTimer = setInterval(() => {
     if (view.webContents.isDestroyed()) return;
-    if (!view.getVisible() || settingsOverlayOpen || windowRef?.isMinimized() || !state.documentReady) {
-      state.pingSentAt = 0; return;
+    if (
+      !view.getVisible() ||
+      settingsOverlayOpen ||
+      windowRef?.isMinimized() ||
+      !state.documentReady
+    ) {
+      state.pingSentAt = 0;
+      return;
     }
     if (state.pingSentAt) {
       if (Date.now() - state.pingSentAt > 8000) {
-        sendStatus(state, 'unresponsive', { message: 'Page is not responding. Reload to recover.' });
+        sendStatus(state, 'unresponsive', {
+          message: 'Page is not responding. Reload to recover.',
+        });
       }
       return;
     }
@@ -228,20 +260,28 @@ function createProviderView(providerId, profileId) {
     clearTimeout(state.loadTimer);
     sendStatus(state, 'loading');
     state.loadTimer = setTimeout(() => {
-      if (state.status === 'loading') sendStatus(state, 'slow', { message: 'Taking longer than expected' });
+      if (state.status === 'loading')
+        sendStatus(state, 'slow', { message: 'Taking longer than expected' });
     }, 15000);
   });
-  view.webContents.on('dom-ready', () => { state.documentReady = true; state.pingSentAt = 0; });
+  view.webContents.on('dom-ready', () => {
+    state.documentReady = true;
+    state.pingSentAt = 0;
+  });
   view.webContents.on('did-stop-loading', () => {
     if (['loading', 'slow'].includes(state.status)) sendStatus(state, 'ready');
   });
-  view.webContents.on('unresponsive', () => sendStatus(state, 'unresponsive', { message: 'Page is not responding. Reload to recover.' }));
+  view.webContents.on('unresponsive', () =>
+    sendStatus(state, 'unresponsive', { message: 'Page is not responding. Reload to recover.' }),
+  );
   view.webContents.on('responsive', () => {
     if (state.status === 'unresponsive') sendStatus(state, 'ready');
   });
   view.webContents.on('render-process-gone', (_event, details) => {
     view.setVisible(false);
-    sendStatus(state, 'crashed', { message: `Page stopped (${details.reason}). Reload to recover.` });
+    sendStatus(state, 'crashed', {
+      message: `Page stopped (${details.reason}). Reload to recover.`,
+    });
   });
   installShortcuts(view.webContents);
   view.webContents.on('focus', () => {
@@ -249,9 +289,13 @@ function createProviderView(providerId, profileId) {
     activeViewKey = key;
     sendToApp('app:page-focused', key);
   });
-  view.webContents.on('did-fail-load', (_event, errorCode, errorDescription, _validatedURL, isMainFrame) => {
-    if (isMainFrame && errorCode !== -3) sendStatus(state, 'error', { message: errorDescription });
-  });
+  view.webContents.on(
+    'did-fail-load',
+    (_event, errorCode, errorDescription, _validatedURL, isMainFrame) => {
+      if (isMainFrame && errorCode !== -3)
+        sendStatus(state, 'error', { message: errorDescription });
+    },
+  );
   view.webContents.on('will-navigate', (event, targetUrl) => {
     if (!isSafeHttpsUrl(targetUrl)) event.preventDefault();
   });
@@ -261,7 +305,10 @@ function createProviderView(providerId, profileId) {
   view.webContents.on('will-redirect', (event, targetUrl) => {
     if (!isSafeHttpsUrl(targetUrl)) event.preventDefault();
   });
-  view.webContents.on('did-navigate', () => { state.lastUrl = view.webContents.getURL(); sendHistoryState(state); });
+  view.webContents.on('did-navigate', () => {
+    state.lastUrl = view.webContents.getURL();
+    sendHistoryState(state);
+  });
   view.webContents.on('did-navigate-in-page', () => sendHistoryState(state));
   view.webContents.on('did-finish-load', () => sendHistoryState(state));
   view.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -298,9 +345,12 @@ function runSearch(query, providerIds) {
   const selected = [...new Set(providerIds.filter((id) => Object.hasOwn(PROVIDERS, id)))];
   if (selected.length === 0) throw new Error('Choose at least one search engine.');
   const targets = searchTargets(selected);
-  if (targets.length === 0) throw new Error('Choose at least one profile for a selected search engine in Settings.');
+  if (targets.length === 0)
+    throw new Error('Choose at least one profile for a selected search engine in Settings.');
   if (targets.length > MAX_ACTIVE_PAGES) {
-    throw new Error(`Choose up to ${MAX_ACTIVE_PAGES} engine and profile combinations per search to keep the app responsive.`);
+    throw new Error(
+      `Choose up to ${MAX_ACTIVE_PAGES} engine and profile combinations per search to keep the app responsive.`,
+    );
   }
 
   searchGeneration += 1;
@@ -318,24 +368,31 @@ function runSearch(query, providerIds) {
       destroyProviderView(target.viewKey);
       currentViewKeys.add(target.viewKey);
     }
-    const state = providerViews.get(target.viewKey) || createProviderView(target.providerId, target.profileId);
+    const state =
+      providerViews.get(target.viewKey) || createProviderView(target.providerId, target.profileId);
     state.generation = thisGeneration;
     state.view.setVisible(false);
     sendStatus(state, 'loading');
-    void state.view.webContents.loadURL(searchUrl(PROVIDERS[target.providerId], normalizedQuery)).catch((error) => {
-      if (state.generation === thisGeneration && !String(error).includes('ERR_ABORTED')) {
-        sendStatus(state, 'error', { message: error.message });
-      }
-    });
+    void state.view.webContents
+      .loadURL(searchUrl(PROVIDERS[target.providerId], normalizedQuery))
+      .catch((error) => {
+        if (state.generation === thisGeneration && !String(error).includes('ERR_ABORTED')) {
+          sendStatus(state, 'error', { message: error.message });
+        }
+      });
   }
 
   return { query: normalizedQuery, targets };
 }
 
+function hideProviderViews() {
+  for (const key of currentViewKeys) providerViews.get(key)?.view.setVisible(false);
+}
+
 function syncProviderLayout(rectangles) {
   if (!Array.isArray(rectangles)) return;
   if (settingsOverlayOpen) {
-    for (const key of currentViewKeys) providerViews.get(key)?.view.setVisible(false);
+    hideProviderViews();
     return;
   }
   const [windowWidth, windowHeight] = windowRef.getContentSize();
@@ -357,7 +414,12 @@ function syncProviderLayout(rectangles) {
     const height = Number(rect.height);
     if (![x, y, width, height].every(Number.isFinite)) continue;
 
-    const visible = !['error', 'crashed', 'unresponsive'].includes(state.status) && width > 1 && height > 1 && y < windowHeight && y + height > 0;
+    const visible =
+      !['error', 'crashed', 'unresponsive'].includes(state.status) &&
+      width > 1 &&
+      height > 1 &&
+      y < windowHeight &&
+      y + height > 0;
     state.view.setVisible(visible);
     if (!visible) continue;
 
@@ -388,7 +450,11 @@ function clearActiveSearchViews() {
 }
 
 function pruneViewsToSettings() {
-  const allowedKeys = new Set(searchTargets(currentSearchProviders.filter(id => PROVIDERS[id])).map((target) => target.viewKey));
+  const allowedKeys = new Set(
+    searchTargets(currentSearchProviders.filter((id) => PROVIDERS[id])).map(
+      (target) => target.viewKey,
+    ),
+  );
   currentViewKeys = new Set([...currentViewKeys].filter((key) => allowedKeys.has(key)));
   for (const key of providerViews.keys()) {
     if (!allowedKeys.has(key)) destroyProviderView(key);
@@ -401,12 +467,16 @@ function destroyProfileViews(profileId) {
   }
 }
 
+async function clearSessionData(providerId, profileId) {
+  const providerSession = session.fromPartition(partitionFor(providerId, profileId));
+  await providerSession.clearStorageData();
+  await providerSession.clearCache();
+}
+
 async function deleteProfileData(profileId) {
   destroyProfileViews(profileId);
   for (const providerId of Object.keys(PROVIDERS)) {
-    const profileSession = session.fromPartition(partitionFor(providerId, profileId));
-    await profileSession.clearStorageData();
-    await profileSession.clearCache();
+    await clearSessionData(providerId, profileId);
   }
 }
 
@@ -414,10 +484,15 @@ async function saveSettings(payload) {
   const nextSettings = validateSettings(payload);
   const nextIds = new Set(nextSettings.profiles.map((profile) => profile.id));
   const removedProfiles = settings.profiles.filter((profile) => !nextIds.has(profile.id));
-  const removedEngines = settings.customEngines.filter(engine => !nextSettings.customEngines.some(next => next.id === engine.id));
+  const removedEngines = settings.customEngines.filter(
+    (engine) => !nextSettings.customEngines.some((next) => next.id === engine.id),
+  );
 
   if (removedProfiles.length || removedEngines.length) {
-    const names = [...removedProfiles.map(p => `profile “${p.name}”`), ...removedEngines.map(e => `engine “${e.label}”`)].join(', ');
+    const names = [
+      ...removedProfiles.map((p) => `profile “${p.name}”`),
+      ...removedEngines.map((e) => `engine “${e.label}”`),
+    ].join(', ');
     const { response } = await require('electron').dialog.showMessageBox(windowRef, {
       type: 'warning',
       buttons: ['Cancel', 'Delete and clear data'],
@@ -425,16 +500,16 @@ async function saveSettings(payload) {
       cancelId: 0,
       noLink: true,
       message: `Delete ${names}?`,
-      detail: 'This permanently clears saved sign-ins, cookies, and site data belonging to the removed profiles or engines.',
+      detail:
+        'This permanently clears saved sign-ins, cookies, and site data belonging to the removed profiles or engines.',
     });
-    if (response !== 1) return { cancelled: true, settings: cloneSettings(settings) };
+    if (response !== 1) return { cancelled: true, settings: structuredClone(settings) };
 
     for (const profile of removedProfiles) await deleteProfileData(profile.id);
     for (const engine of removedEngines) {
       for (const profile of settings.profiles) {
         destroyProviderView(viewKey(engine.id, profile.id));
-        const oldSession = session.fromPartition(partitionFor(engine.id, profile.id));
-        await oldSession.clearStorageData(); await oldSession.clearCache();
+        await clearSessionData(engine.id, profile.id);
       }
     }
   }
@@ -444,7 +519,7 @@ async function saveSettings(payload) {
   refreshProviders();
   nativeTheme.themeSource = settings.theme;
   pruneViewsToSettings();
-  return { cancelled: false, settings: cloneSettings(settings) };
+  return { cancelled: false, settings: structuredClone(settings) };
 }
 
 function appCommand(command) {
@@ -464,26 +539,55 @@ function installShortcuts(contents) {
     else if (mod && /^[1-9]$/.test(key)) command = `page-${key}`;
     else if (mod && input.shift && key === 's') command = 'layout';
     else if (!settingsOverlayOpen && ((mod && key === 'r') || key === 'f5')) {
-      event.preventDefault(); navigatePage(activeViewKey, 'reload'); return;
+      event.preventDefault();
+      navigatePage(activeViewKey, 'reload');
+      return;
     } else if (!settingsOverlayOpen && key === 'escape') {
-      event.preventDefault(); navigatePage(activeViewKey, 'stop'); return;
-    } else if (!settingsOverlayOpen && ((input.alt && ['arrowleft', 'arrowright'].includes(key)) || (mod && ['[', ']'].includes(key)))) {
-      event.preventDefault(); navigatePage(activeViewKey, ['arrowleft', '['].includes(key) ? 'back' : 'forward'); return;
+      event.preventDefault();
+      navigatePage(activeViewKey, 'stop');
+      return;
+    } else if (
+      !settingsOverlayOpen &&
+      ((input.alt && ['arrowleft', 'arrowright'].includes(key)) ||
+        (mod && ['[', ']'].includes(key)))
+    ) {
+      event.preventDefault();
+      navigatePage(activeViewKey, ['arrowleft', '['].includes(key) ? 'back' : 'forward');
+      return;
     }
-    if (command) { event.preventDefault(); appCommand(command); }
+    if (command) {
+      event.preventDefault();
+      appCommand(command);
+    }
   });
 }
 function installMenu() {
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { label: 'Search Stack', submenu: [
-      { label: 'Search', click: () => appCommand('search') },
-      { label: 'Settings…', click: () => appCommand('settings') },
-      { type: 'separator' }, { role: 'quit' },
-    ] },
-    { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' },
-      { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
-    { label: 'View', submenu: [{ role: 'togglefullscreen' }, { role: 'minimize' }] },
-  ]));
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: 'Search Stack',
+        submenu: [
+          { label: 'Search', click: () => appCommand('search') },
+          { label: 'Settings…', click: () => appCommand('settings') },
+          { type: 'separator' },
+          { role: 'quit' },
+        ],
+      },
+      {
+        label: 'Edit',
+        submenu: [
+          { role: 'undo' },
+          { role: 'redo' },
+          { type: 'separator' },
+          { role: 'cut' },
+          { role: 'copy' },
+          { role: 'paste' },
+          { role: 'selectAll' },
+        ],
+      },
+      { label: 'View', submenu: [{ role: 'togglefullscreen' }, { role: 'minimize' }] },
+    ]),
+  );
 }
 
 function createWindow() {
@@ -513,28 +617,25 @@ function createWindow() {
   installShortcuts(appView.webContents);
 
   appView.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  appView.webContents.on('will-navigate', (event, targetUrl) => {
-    try {
-      const url = new URL(targetUrl);
-      if (url.protocol !== 'app:' || url.hostname !== 'search-stack') event.preventDefault();
-    } catch {
-      event.preventDefault();
-    }
-  });
-  appView.webContents.on('will-redirect', (event, targetUrl) => {
-    try {
-      const url = new URL(targetUrl);
-      if (url.protocol !== 'app:' || url.hostname !== 'search-stack') event.preventDefault();
-    } catch {
-      event.preventDefault();
-    }
-  });
+  for (const eventName of ['will-navigate', 'will-redirect']) {
+    appView.webContents.on(eventName, (event, targetUrl) => {
+      try {
+        const url = new URL(targetUrl);
+        if (url.protocol !== 'app:' || url.hostname !== 'search-stack') event.preventDefault();
+      } catch {
+        event.preventDefault();
+      }
+    });
+  }
 
   appView.webContents.on('did-finish-load', () => {
     const [width, height] = windowRef.getContentSize();
     appView.setBounds({ x: 0, y: 0, width, height });
-    sendToApp('app:providers', Object.entries(PROVIDERS).map(([id, provider]) => ({ id, label: provider.label })));
-    sendToApp('app:settings', cloneSettings(settings));
+    sendToApp(
+      'app:providers',
+      Object.entries(PROVIDERS).map(([id, provider]) => ({ id, label: provider.label })),
+    );
+    sendToApp('app:settings', structuredClone(settings));
   });
 
   windowRef.on('resize', () => {
@@ -590,43 +691,51 @@ app.on('web-contents-created', (_event, contents) => {
   contents.on('will-attach-webview', (event) => event.preventDefault());
 });
 
-ipcMain.handle('app:search', async (event, payload) => {
-  if (!isAppRenderer(event.sender)) throw new Error('Unauthorized app message.');
+function handleAppRequest(channel, handler) {
+  ipcMain.handle(channel, (event, payload) => {
+    if (!isAppRenderer(event.sender)) throw new Error('Unauthorized app message.');
+    return handler(payload);
+  });
+}
+
+handleAppRequest('app:search', async (payload) => {
   return runSearch(payload?.query, payload?.providers);
 });
-ipcMain.handle('app:clear-search-views', (event) => {
-  if (!isAppRenderer(event.sender)) throw new Error('Unauthorized app message.');
+handleAppRequest('app:clear-search-views', () => {
   clearActiveSearchViews();
 });
-ipcMain.handle('app:get-settings', async (event) => {
-  if (!isAppRenderer(event.sender)) throw new Error('Unauthorized app message.');
+handleAppRequest('app:get-settings', async () => {
   await settingsQueue;
-  return cloneSettings(settings);
+  return structuredClone(settings);
 });
-ipcMain.handle('app:save-settings', async (event, payload) => {
-  if (!isAppRenderer(event.sender)) throw new Error('Unauthorized app message.');
+handleAppRequest('app:save-settings', async (payload) => {
   return queueSettings(() => saveSettings(payload));
 });
-ipcMain.handle('app:preferences', (event, patch) => {
-  if (!isAppRenderer(event.sender)) throw new Error('Unauthorized app message.');
+handleAppRequest('app:preferences', (patch) => {
   return queueSettings(async () => {
-    const next = validateSettings({ ...settings,
+    const next = validateSettings({
+      ...settings,
       enabledEngines: patch?.enabledEngines ?? settings.enabledEngines,
       presentation: patch?.presentation ?? settings.presentation,
       splitPages: patch?.splitPages ?? settings.splitPages,
     });
-    await persistSettings(next); settings = next;
-    return cloneSettings(settings);
+    await persistSettings(next);
+    settings = next;
+    return structuredClone(settings);
   });
 });
 function navigatePage(key, action) {
   const state = providerViews.get(key);
   if (!state || !currentViewKeys.has(key) || state.view.webContents.isDestroyed()) return;
   const wc = state.view.webContents;
-  if (action === 'back') { if (wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack(); }
-  else if (action === 'forward') { if (wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward(); }
-  else if (action === 'stop') { sendStatus(state, 'stopped', { message: 'Loading stopped' }); wc.stop(); }
-  else if (action === 'reload') {
+  if (action === 'back') {
+    if (wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
+  } else if (action === 'forward') {
+    if (wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward();
+  } else if (action === 'stop') {
+    sendStatus(state, 'stopped', { message: 'Loading stopped' });
+    wc.stop();
+  } else if (action === 'reload') {
     const url = state.lastUrl || wc.getURL();
     if (!isSafeHttpsUrl(url)) return;
     if (['crashed', 'unresponsive', 'slow'].includes(state.status)) {
@@ -641,8 +750,7 @@ function navigatePage(key, action) {
     sendToApp('app:layout-changed');
   } else throw new Error('Unsupported navigation action.');
 }
-ipcMain.handle('app:navigate', (event, payload) => {
-  if (!isAppRenderer(event.sender)) throw new Error('Unauthorized app message.');
+handleAppRequest('app:navigate', (payload) => {
   return navigatePage(String(payload?.viewKey || ''), payload?.action);
 });
 ipcMain.on('app:active-page', (event, key) => {
@@ -661,9 +769,7 @@ ipcMain.on('app:settings-overlay', (event, isOpen) => {
   if (!isAppRenderer(event.sender)) return;
   settingsOverlayOpen = isOpen === true;
   if (!settingsOverlayOpen) sendToApp('app:layout-changed');
-  else {
-    for (const key of currentViewKeys) providerViews.get(key)?.view.setVisible(false);
-  }
+  else hideProviderViews();
 });
 ipcMain.on('provider:edge-wheel', (event, deltaY) => {
   const state = findProviderState(event.sender);
@@ -672,7 +778,7 @@ ipcMain.on('provider:edge-wheel', (event, deltaY) => {
   sendToApp('app:scroll-by', boundedDelta);
 });
 
-ipcMain.on('provider:pong', event => {
+ipcMain.on('provider:pong', (event) => {
   const state = findProviderState(event.sender);
   if (state && event.senderFrame === event.sender.mainFrame) state.pingSentAt = 0;
 });

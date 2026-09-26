@@ -12,7 +12,10 @@ const scanNext = document.querySelector('#scan-next');
 const scanModeToggle = document.querySelector('#scan-mode-toggle');
 const splitToggle = document.querySelector('#split-toggle');
 const splitControls = document.querySelector('#split-controls');
-const splitSelects = [document.querySelector('#split-left'), document.querySelector('#split-right')];
+const splitSelects = [
+  document.querySelector('#split-left'),
+  document.querySelector('#split-right'),
+];
 const settingsDialog = document.querySelector('#settings-dialog');
 const settingsButton = document.querySelector('#settings-button');
 const settingsSaveButton = document.querySelector('#settings-save');
@@ -38,21 +41,33 @@ let scrollJumpPending = false;
 let scrollJumpTimer = 0;
 
 function checkedProviderIds() {
-  return [...enginePicker.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
+  return [...enginePicker.querySelectorAll('input[type="checkbox"]:checked')].map(
+    (input) => input.value,
+  );
 }
 
 function activeTargets(providerIds, sourceSettings = currentSettings) {
   if (!sourceSettings) return [];
   const profilesById = new Map(sourceSettings.profiles.map((profile) => [profile.id, profile]));
-  return providerIds.flatMap((providerId) => (sourceSettings.engineProfiles[providerId] || [])
-    .map((profileId) => profilesById.get(profileId))
-    .filter(Boolean)
-    .map((profile) => ({
-      providerId,
-      profileId: profile.id,
-      profileName: profile.name,
-      viewKey: `${providerId}:${profile.id}`,
-    })));
+  return providerIds.flatMap((providerId) =>
+    (sourceSettings.engineProfiles[providerId] || [])
+      .map((profileId) => profilesById.get(profileId))
+      .filter(Boolean)
+      .map((profile) => ({
+        providerId,
+        profileId: profile.id,
+        profileName: profile.name,
+        viewKey: `${providerId}:${profile.id}`,
+      })),
+  );
+}
+
+function scanButtons() {
+  return [...scanTabs.querySelectorAll('button[data-view-key]')];
+}
+
+function providerLabel(id) {
+  return providers.find((provider) => provider.id === id)?.label || id;
 }
 
 function resultSections() {
@@ -60,7 +75,7 @@ function resultSections() {
 }
 
 function updateScanNavigation() {
-  const buttons = [...scanTabs.querySelectorAll('button[data-view-key]')];
+  const buttons = scanButtons();
   const activeIndex = buttons.findIndex((button) => button.dataset.viewKey === activeViewKey);
   buttons.forEach((button, index) => {
     const selected = index === activeIndex;
@@ -68,15 +83,19 @@ function updateScanNavigation() {
     button.setAttribute('aria-current', selected ? 'location' : 'false');
   });
   buttons[activeIndex]?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  scanCounter.textContent = buttons.length && activeIndex >= 0
-    ? `${activeIndex + 1} of ${buttons.length}`
-    : `0 of ${buttons.length}`;
+  scanCounter.textContent =
+    buttons.length && activeIndex >= 0
+      ? `${activeIndex + 1} of ${buttons.length}`
+      : `0 of ${buttons.length}`;
   scanPrevious.disabled = activeIndex <= 0;
   scanNext.disabled = activeIndex < 0 || activeIndex >= buttons.length - 1;
   scanModeToggle.setAttribute('aria-pressed', String(presentation !== 'stack'));
   scanModeToggle.textContent = presentation === 'stack' ? '⛶ Focus' : '▤ Stack';
   splitToggle.disabled = buttons.length < 2;
-  splitToggle.title = buttons.length < 2 ? 'Enable at least two engine/profile pages in Settings' : 'Compare two pages side by side';
+  splitToggle.title =
+    buttons.length < 2
+      ? 'Enable at least two engine/profile pages in Settings'
+      : 'Compare two pages side by side';
   splitToggle.setAttribute('aria-pressed', String(presentation === 'split'));
   splitToggle.textContent = presentation === 'split' ? '⛶ Single' : '◫ Split';
   splitControls.hidden = presentation !== 'split';
@@ -84,13 +103,14 @@ function updateScanNavigation() {
     select.value = splitKeys[side] || '';
     select.closest('label').classList.toggle('is-active', activePane === side);
   });
-  for (const section of resultSections()) section.classList.toggle('is-active-pane', section.dataset.viewKey === activeViewKey);
+  for (const section of resultSections())
+    section.classList.toggle('is-active-pane', section.dataset.viewKey === activeViewKey);
 }
 
 function renderScanNavigation(targets) {
   scanTabs.replaceChildren();
   targets.forEach((target, index) => {
-    const providerName = providers.find((provider) => provider.id === target.providerId)?.label || target.providerId;
+    const providerName = providerLabel(target.providerId);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'scan-tab';
@@ -116,16 +136,23 @@ function renderScanNavigation(targets) {
     scanTabs.append(button);
   });
   for (const select of splitSelects) {
-    select.replaceChildren(...targets.map(target => new Option(`${providers.find(p => p.id === target.providerId)?.label || target.providerId} · ${target.profileName}`, target.viewKey)));
+    select.replaceChildren(
+      ...targets.map(
+        (target) =>
+          new Option(`${providerLabel(target.providerId)} · ${target.profileName}`, target.viewKey),
+      ),
+    );
   }
   updateScanNavigation();
 }
 
 function reconcileSplitKeys() {
-  const keys = resultSections().map(section => section.dataset.viewKey);
+  const keys = resultSections().map((section) => section.dataset.viewKey);
   const right = keys.includes(splitKeys[1]) ? splitKeys[1] : '';
-  const left = keys.includes(splitKeys[0]) ? splitKeys[0] : keys.find(key => key !== right);
-  splitKeys = [left, right && right !== left ? right : keys.find(key => key !== left)].filter(Boolean);
+  const left = keys.includes(splitKeys[0]) ? splitKeys[0] : keys.find((key) => key !== right);
+  splitKeys = [left, right && right !== left ? right : keys.find((key) => key !== left)].filter(
+    Boolean,
+  );
 }
 
 function applyPresentation() {
@@ -139,7 +166,10 @@ function applyPresentation() {
   scanToolbar.hidden = sections.length === 0;
   for (const section of sections) {
     const key = section.dataset.viewKey;
-    section.hidden = presentation === 'split' ? !splitKeys.includes(key) : presentation === 'focus' && key !== activeViewKey;
+    section.hidden =
+      presentation === 'split'
+        ? !splitKeys.includes(key)
+        : presentation === 'focus' && key !== activeViewKey;
     section.dataset.pane = splitKeys[0] === key ? 'left' : 'right';
   }
   updateScanNavigation();
@@ -148,7 +178,7 @@ function applyPresentation() {
 }
 
 function chooseSplitPage(side, key) {
-  if (!resultSections().some(section => section.dataset.viewKey === key)) return;
+  if (!resultSections().some((section) => section.dataset.viewKey === key)) return;
   const otherSide = 1 - side;
   if (splitKeys[otherSide] === key) splitKeys[otherSide] = splitKeys[side];
   splitKeys[side] = key;
@@ -157,14 +187,17 @@ function chooseSplitPage(side, key) {
   savePreferences({ presentation, splitPages: splitKeys });
 }
 
+function saveStackScroll() {
+  if (presentation !== 'stack') return;
+  cancelScrollJump();
+  scrollYBeforeFocus = window.scrollY;
+  window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
 function enterSplit() {
   if (resultSections().length < 2) return;
-  if (presentation === 'stack') {
-    cancelScrollJump();
-    scrollYBeforeFocus = window.scrollY;
-    window.scrollTo({ top: 0, behavior: 'auto' });
-  }
-  splitKeys = [activeViewKey, splitKeys.find(key => key !== activeViewKey)];
+  saveStackScroll();
+  splitKeys = [activeViewKey, splitKeys.find((key) => key !== activeViewKey)];
   activePane = 0;
   presentation = 'split';
   applyPresentation();
@@ -172,18 +205,26 @@ function enterSplit() {
 }
 
 function selectScanTarget(viewKey, { jumpToSection = false } = {}) {
-  const section = resultSections().find(item => item.dataset.viewKey === viewKey);
+  const section = resultSections().find((item) => item.dataset.viewKey === viewKey);
   if (!section) return;
-  if (presentation === 'split') { chooseSplitPage(activePane, viewKey); return; }
+  if (presentation === 'split') {
+    chooseSplitPage(activePane, viewKey);
+    return;
+  }
   activeViewKey = viewKey;
   window.searchStack.setActivePage(viewKey);
-  if (presentation === 'focus') { applyPresentation(); return; }
+  if (presentation === 'focus') {
+    applyPresentation();
+    return;
+  }
   updateScanNavigation();
   if (jumpToSection) {
     scrollJumpPending = true;
     clearTimeout(scrollJumpTimer);
     scrollJumpTimer = setTimeout(finishScrollJump, 1400);
-    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 'auto'
+      : 'smooth';
     section.scrollIntoView({ behavior, block: 'start' });
   }
 }
@@ -203,7 +244,7 @@ function cancelScrollJump() {
 }
 
 function moveScanTarget(step) {
-  const buttons = [...scanTabs.querySelectorAll('button[data-view-key]')];
+  const buttons = scanButtons();
   const index = buttons.findIndex((button) => button.dataset.viewKey === activeViewKey);
   const next = buttons[index + step];
   if (next) selectScanTarget(next.dataset.viewKey, { jumpToSection: presentation === 'stack' });
@@ -211,11 +252,7 @@ function moveScanTarget(step) {
 
 function enterFocusScan(viewKey = activeViewKey) {
   if (!resultSections().length) return;
-  if (presentation === 'stack') {
-    cancelScrollJump();
-    scrollYBeforeFocus = window.scrollY;
-    window.scrollTo({ top: 0, behavior: 'auto' });
-  }
+  saveStackScroll();
   const target = resultSections().find((section) => section.dataset.viewKey === viewKey);
   if (target) activeViewKey = viewKey;
   presentation = 'focus';
@@ -247,7 +284,9 @@ function updateActiveTargetFromScroll() {
   }
 }
 
-function updateSearchButtonLabel() { searchButton.textContent = 'Search ↵'; }
+function updateSearchButtonLabel() {
+  searchButton.textContent = 'Search ↵';
+}
 
 function makeProviderPicker(engineProviders) {
   providers = engineProviders;
@@ -286,9 +325,12 @@ function makeProviderPicker(engineProviders) {
 
 function setError(message) {
   const notice = document.querySelector('#app-notice');
-  notice.textContent = message; notice.hidden = false;
+  notice.textContent = message;
+  notice.hidden = false;
 }
-function clearError() { document.querySelector('#app-notice').hidden = true; }
+function clearError() {
+  document.querySelector('#app-notice').hidden = true;
+}
 
 function createNavigationButton(action, label, symbol, disabled = false) {
   const button = document.createElement('button');
@@ -320,11 +362,12 @@ function createResultSection(target, index) {
   const title = document.createElement('h2');
   title.className = 'engine-name';
   title.id = `result-title-${index + 1}`;
-  title.textContent = providers.find((provider) => provider.id === target.providerId)?.label || target.providerId;
+  title.textContent = providerLabel(target.providerId);
   const profileBadge = document.createElement('span');
   profileBadge.className = 'profile-badge';
   profileBadge.textContent = target.profileName;
-  const location = document.createElement('span'); location.className = 'page-location';
+  const location = document.createElement('span');
+  location.className = 'page-location';
   titleWrap.append(title, profileBadge, location);
   left.append(number, titleWrap);
 
@@ -344,7 +387,10 @@ function createResultSection(target, index) {
   focusButton.type = 'button';
   focusButton.dataset.focusView = target.viewKey;
   focusButton.textContent = 'Focus this page';
-  focusButton.setAttribute('aria-label', `Focus ${title.textContent}, ${target.profileName} profile`);
+  focusButton.setAttribute(
+    'aria-label',
+    `Focus ${title.textContent}, ${target.profileName} profile`,
+  );
   const status = document.createElement('span');
   status.className = 'engine-state';
   status.dataset.status = 'loading';
@@ -368,12 +414,13 @@ function syncLayout() {
   const rectangles = [];
   for (const slot of results.querySelectorAll('.provider-slot')) {
     const rect = slot.getBoundingClientRect();
+    const top = Math.max(rect.top, presentation === 'stack' ? 96 : 0);
     rectangles.push({
       viewKey: slot.dataset.viewKey,
       x: Math.round(rect.left),
-      y: Math.round(Math.max(rect.top, presentation === 'stack' ? 96 : 0)),
+      y: Math.round(top),
       width: Math.round(rect.width),
-      height: Math.round(Math.max(0, rect.bottom - Math.max(rect.top, presentation === 'stack' ? 96 : 0))),
+      height: Math.round(Math.max(0, rect.bottom - top)),
     });
   }
   window.searchStack.syncLayout(rectangles);
@@ -384,6 +431,12 @@ function scheduleLayoutSync() {
   layoutFrame = requestAnimationFrame(syncLayout);
 }
 
+function rejectSearch(message) {
+  setError(message);
+  void window.searchStack.clearSearchViews();
+  clearResults();
+}
+
 async function submitSearch(query) {
   const providerIds = checkedProviderIds();
   const normalized = String(query).trim();
@@ -392,32 +445,32 @@ async function submitSearch(query) {
     return;
   }
   if (!providerIds.length) {
-    setError('Select at least one search engine.');
-    void window.searchStack.clearSearchViews();
-    clearResults();
+    rejectSearch('Select at least one search engine.');
     return;
   }
   const targets = activeTargets(providerIds);
   if (!targets.length) {
-    setError('Choose at least one profile for a selected engine in Settings.');
-    void window.searchStack.clearSearchViews();
-    clearResults();
+    rejectSearch('Choose at least one profile for a selected engine in Settings.');
     return;
   }
   if (targets.length > 12) {
-    setError('Choose up to 12 engine and profile combinations per search to keep the app responsive.');
-    void window.searchStack.clearSearchViews();
-    clearResults();
+    rejectSearch(
+      'Choose up to 12 engine and profile combinations per search to keep the app responsive.',
+    );
     return;
   }
 
   clearError();
   const firstSearch = !currentQuery;
-  if (firstSearch) { presentation = currentSettings.presentation; splitKeys = [...currentSettings.splitPages]; }
+  if (firstSearch) {
+    presentation = currentSettings.presentation;
+    splitKeys = [...currentSettings.splitPages];
+  }
   currentQuery = normalized;
   currentProviderIds = providerIds;
   queryInput.value = normalized;
-  if (!targets.some(target => target.viewKey === activeViewKey)) activeViewKey = targets[0].viewKey;
+  if (!targets.some((target) => target.viewKey === activeViewKey))
+    activeViewKey = targets[0].viewKey;
   emptyState.hidden = true;
   results.querySelectorAll('.engine-section').forEach((section) => section.remove());
   targets.forEach((target, index) => results.append(createResultSection(target, index)));
@@ -450,10 +503,6 @@ function clearResults() {
   scheduleLayoutSync();
 }
 
-function cloneSettings(source) {
-  return structuredClone(source);
-}
-
 function renderProfileEditor() {
   if (!workingSettings) return;
   profileList.replaceChildren();
@@ -477,10 +526,13 @@ function renderProfileEditor() {
       remove.textContent = 'Remove';
       remove.setAttribute('aria-label', `Remove ${profile.name} profile`);
       remove.addEventListener('click', () => {
-        workingSettings.profiles = workingSettings.profiles.filter((item) => item.id !== profile.id);
+        workingSettings.profiles = workingSettings.profiles.filter(
+          (item) => item.id !== profile.id,
+        );
         for (const provider of editorProviders()) {
-          workingSettings.engineProfiles[provider.id] = workingSettings.engineProfiles[provider.id]
-            .filter((id) => id !== profile.id);
+          workingSettings.engineProfiles[provider.id] = workingSettings.engineProfiles[
+            provider.id
+          ].filter((id) => id !== profile.id);
         }
         renderSettingsEditor();
       });
@@ -499,21 +551,33 @@ function renderProfileMatrix() {
     const title = document.createElement('h4');
     const enabledLabel = document.createElement('label');
     const enabled = document.createElement('input');
-    enabled.type = 'checkbox'; enabled.checked = workingSettings.enabledEngines.includes(provider.id);
+    enabled.type = 'checkbox';
+    enabled.checked = workingSettings.enabledEngines.includes(provider.id);
     enabled.setAttribute('aria-label', `Enable ${provider.label}`);
     enabled.addEventListener('change', () => {
-      workingSettings.enabledEngines = enabled.checked ? [...workingSettings.enabledEngines, provider.id] : workingSettings.enabledEngines.filter(id => id !== provider.id);
+      workingSettings.enabledEngines = enabled.checked
+        ? [...workingSettings.enabledEngines, provider.id]
+        : workingSettings.enabledEngines.filter((id) => id !== provider.id);
     });
     enabledLabel.append(enabled, document.createTextNode(` ${provider.label}`));
     title.append(enabledLabel);
     if (provider.id.startsWith('custom-')) {
-      const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Remove'; remove.className = 'remove-profile-button';
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = 'Remove';
+      remove.className = 'remove-profile-button';
       remove.setAttribute('aria-label', `Remove ${provider.label} engine`);
       remove.addEventListener('click', () => {
-        workingSettings.customEngines = workingSettings.customEngines.filter(e => e.id !== provider.id);
-        workingSettings.enabledEngines = workingSettings.enabledEngines.filter(id => id !== provider.id);
-        delete workingSettings.engineProfiles[provider.id]; renderProfileMatrix();
-      }); title.append(remove);
+        workingSettings.customEngines = workingSettings.customEngines.filter(
+          (e) => e.id !== provider.id,
+        );
+        workingSettings.enabledEngines = workingSettings.enabledEngines.filter(
+          (id) => id !== provider.id,
+        );
+        delete workingSettings.engineProfiles[provider.id];
+        renderProfileMatrix();
+      });
+      title.append(remove);
     }
     const choices = document.createElement('div');
     choices.className = 'profile-engine-choices';
@@ -549,7 +613,7 @@ async function openSettings() {
   if (settingsDialog.open) return;
   try {
     currentSettings = await window.searchStack.getSettings();
-    workingSettings = cloneSettings(currentSettings);
+    workingSettings = structuredClone(currentSettings);
     workingSettings.enabledEngines = checkedProviderIds();
     document.querySelector('#theme').value = workingSettings.theme;
     settingsNotice.textContent = '';
@@ -573,7 +637,9 @@ function addProfile() {
     settingsNotice.textContent = 'Profile names must be 1–48 characters long.';
     return;
   }
-  if (workingSettings.profiles.some((profile) => profile.name.toLowerCase() === name.toLowerCase())) {
+  if (
+    workingSettings.profiles.some((profile) => profile.name.toLowerCase() === name.toLowerCase())
+  ) {
     settingsNotice.textContent = 'Choose a profile name that is not already in use.';
     return;
   }
@@ -592,23 +658,38 @@ function addProfile() {
 async function saveSettings() {
   if (settingsSaving) return;
   settingsSaving = true;
-  settingsDialog.querySelectorAll('button, input, select').forEach(control => { control.disabled = true; });
+  settingsDialog.querySelectorAll('button, input, select').forEach((control) => {
+    control.disabled = true;
+  });
   settingsNotice.textContent = 'Saving settings…';
   try {
     const result = await window.searchStack.saveSettings(workingSettings);
     if (result.cancelled) {
       currentSettings = result.settings;
-      workingSettings = cloneSettings(result.settings);
+      workingSettings = structuredClone(result.settings);
       renderSettingsEditor();
       document.querySelector('#theme').value = workingSettings.theme;
       applyTheme();
       settingsNotice.textContent = 'No changes saved.';
       return;
     }
-    const searchChanged = JSON.stringify([currentSettings.engineProfiles, currentSettings.customEngines, checkedProviderIds()]) !== JSON.stringify([result.settings.engineProfiles, result.settings.customEngines, result.settings.enabledEngines]);
+    const searchChanged =
+      JSON.stringify([
+        currentSettings.engineProfiles,
+        currentSettings.customEngines,
+        checkedProviderIds(),
+      ]) !==
+      JSON.stringify([
+        result.settings.engineProfiles,
+        result.settings.customEngines,
+        result.settings.enabledEngines,
+      ]);
     currentSettings = result.settings;
     applyTheme();
-    makeProviderPicker([...providers.filter(e => !e.id.startsWith('custom-')), ...currentSettings.customEngines]);
+    makeProviderPicker([
+      ...providers.filter((e) => !e.id.startsWith('custom-')),
+      ...currentSettings.customEngines,
+    ]);
     currentProviderIds = checkedProviderIds();
     workingSettings = null;
     settingsDialog.close();
@@ -617,7 +698,9 @@ async function saveSettings() {
     settingsNotice.textContent = error.message || 'Settings could not be saved.';
   } finally {
     settingsSaving = false;
-    settingsDialog.querySelectorAll('button, input, select').forEach(control => { control.disabled = false; });
+    settingsDialog.querySelectorAll('button, input, select').forEach((control) => {
+      control.disabled = false;
+    });
   }
 }
 
@@ -629,9 +712,18 @@ form.addEventListener('submit', (event) => {
 settingsButton.addEventListener('click', () => void openSettings());
 document.querySelector('#settings-close').addEventListener('click', () => settingsDialog.close());
 document.querySelector('#settings-cancel').addEventListener('click', () => settingsDialog.close());
-settingsDialog.addEventListener('cancel', event => { if (settingsSaving) event.preventDefault(); });
-settingsDialog.addEventListener('close', () => { workingSettings = null; applyTheme(); window.searchStack.setSettingsOpen(false); scheduleLayoutSync(); });
-document.querySelector('#settings-form').addEventListener('submit', event => event.preventDefault());
+settingsDialog.addEventListener('cancel', (event) => {
+  if (settingsSaving) event.preventDefault();
+});
+settingsDialog.addEventListener('close', () => {
+  workingSettings = null;
+  applyTheme();
+  window.searchStack.setSettingsOpen(false);
+  scheduleLayoutSync();
+});
+document
+  .querySelector('#settings-form')
+  .addEventListener('submit', (event) => event.preventDefault());
 document.querySelector('#add-profile-button').addEventListener('click', addProfile);
 newProfileInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
@@ -646,23 +738,31 @@ scanModeToggle.addEventListener('click', () => {
   savePreferences({ presentation });
 });
 splitToggle.addEventListener('click', () => {
-  if (presentation === 'split') { enterFocusScan(); savePreferences({ presentation }); }
-  else enterSplit();
+  if (presentation === 'split') {
+    enterFocusScan();
+    savePreferences({ presentation });
+  } else enterSplit();
 });
 splitSelects.forEach((select, side) => {
   select.addEventListener('focus', () => {
     if (presentation !== 'split') return;
-    activePane = side; activeViewKey = splitKeys[side];
-    window.searchStack.setActivePage(activeViewKey); updateScanNavigation();
+    activePane = side;
+    activeViewKey = splitKeys[side];
+    window.searchStack.setActivePage(activeViewKey);
+    updateScanNavigation();
   });
   select.addEventListener('change', () => chooseSplitPage(side, select.value));
 });
 document.querySelector('#split-swap').addEventListener('click', () => {
-  splitKeys.reverse(); applyPresentation(); savePreferences({ splitPages: splitKeys });
+  splitKeys.reverse();
+  applyPresentation();
+  savePreferences({ splitPages: splitKeys });
 });
-window.searchStack.onPageFocused(key => {
+window.searchStack.onPageFocused((key) => {
   if (presentation !== 'split' || !splitKeys.includes(key)) return;
-  activePane = splitKeys.indexOf(key); activeViewKey = key; updateScanNavigation();
+  activePane = splitKeys.indexOf(key);
+  activeViewKey = key;
+  updateScanNavigation();
 });
 scanPrevious.addEventListener('click', () => moveScanTarget(-1));
 scanNext.addEventListener('click', () => moveScanTarget(1));
@@ -676,7 +776,7 @@ scanTabs.addEventListener('keydown', (event) => {
   const button = event.target.closest('button[data-view-key]');
   if (!button) return;
   event.preventDefault();
-  const buttons = [...scanTabs.querySelectorAll('button[data-view-key]')];
+  const buttons = scanButtons();
   const index = buttons.indexOf(button);
   const next = buttons[index + (event.key === 'ArrowRight' ? 1 : -1)];
   if (next) {
@@ -693,16 +793,24 @@ results.addEventListener('click', (event) => {
   }
   const clickedSection = event.target.closest('.engine-section');
   if (presentation === 'split' && clickedSection) {
-    activeViewKey = clickedSection.dataset.viewKey; activePane = splitKeys.indexOf(activeViewKey);
-    window.searchStack.setActivePage(activeViewKey); updateScanNavigation();
+    activeViewKey = clickedSection.dataset.viewKey;
+    activePane = splitKeys.indexOf(activeViewKey);
+    window.searchStack.setActivePage(activeViewKey);
+    updateScanNavigation();
   }
   const button = event.target.closest('button[data-action]');
   if (!button || button.disabled) return;
   const section = button.closest('.engine-section');
-  if (section) void window.searchStack.navigate(section.dataset.viewKey, button.dataset.action).catch(error => setError(error.message));
+  if (section)
+    void window.searchStack
+      .navigate(section.dataset.viewKey, button.dataset.action)
+      .catch((error) => setError(error.message));
 });
 
-window.searchStack.onProviders((list) => { providers = list; if (currentSettings) makeProviderPicker(list); });
+window.searchStack.onProviders((list) => {
+  providers = list;
+  if (currentSettings) makeProviderPicker(list);
+});
 window.searchStack.onSettings((nextSettings) => {
   currentSettings = nextSettings;
   presentation = currentSettings.presentation;
@@ -715,21 +823,28 @@ window.searchStack.onProviderStatus(({ viewKey, status, message }) => {
   const section = results.querySelector(`.engine-section[data-view-key="${CSS.escape(viewKey)}"]`);
   if (!section) return;
   const statusNode = section.querySelector('.engine-state');
-  const tab = [...scanTabs.querySelectorAll('button[data-view-key]')]
-    .find((button) => button.dataset.viewKey === viewKey);
+  const tab = scanButtons().find((button) => button.dataset.viewKey === viewKey);
   if (tab) tab.querySelector('.scan-tab-state').dataset.status = status;
   statusNode.dataset.status = status;
-  const messages = { ready: 'Live website', loading: 'Loading…', slow: 'Taking longer than expected', stopped: 'Loading stopped' };
+  const messages = {
+    ready: 'Live website',
+    loading: 'Loading…',
+    slow: 'Taking longer than expected',
+    stopped: 'Loading stopped',
+  };
   statusNode.textContent = message || messages[status] || status;
   statusNode.title = statusNode.textContent;
   section.querySelector('[data-action="stop"]').disabled = !['loading', 'slow'].includes(status);
   const slot = section.querySelector('.provider-slot');
   slot.replaceChildren();
   if (['error', 'crashed', 'unresponsive'].includes(status)) {
-    const placeholder = document.createElement('div'); placeholder.className = 'engine-placeholder';
-    const text = document.createElement('p'); text.textContent = message || 'This page could not load. Other engines are still available.';
+    const placeholder = document.createElement('div');
+    placeholder.className = 'engine-placeholder';
+    const text = document.createElement('p');
+    text.textContent = message || 'This page could not load. Other engines are still available.';
     const retry = createNavigationButton('reload', 'Retry page', '↻');
-    placeholder.append(text, retry); slot.append(placeholder);
+    placeholder.append(text, retry);
+    slot.append(placeholder);
   }
   scheduleLayoutSync();
 });
@@ -737,20 +852,32 @@ window.searchStack.onHistoryState(({ viewKey, url, canGoBack, canGoForward }) =>
   const section = results.querySelector(`.engine-section[data-view-key="${CSS.escape(viewKey)}"]`);
   if (!section) return;
   const location = section.querySelector('.page-location');
-  try { location.textContent = new URL(url).hostname; location.title = url; } catch { location.textContent = ''; }
+  try {
+    location.textContent = new URL(url).hostname;
+    location.title = url;
+  } catch {
+    location.textContent = '';
+  }
   section.querySelector('[data-action="back"]').disabled = !canGoBack;
   section.querySelector('[data-action="forward"]').disabled = !canGoForward;
 });
 window.searchStack.onScrollBy((deltaY) => window.scrollBy({ top: deltaY, behavior: 'auto' }));
 window.searchStack.onFocusSearch(() => {
-  if (!settingsDialog.open) { queryInput.focus(); queryInput.select(); }
+  if (!settingsDialog.open) {
+    queryInput.focus();
+    queryInput.select();
+  }
 });
 window.searchStack.onLayoutChanged(scheduleLayoutSync);
 
-window.addEventListener('scroll', () => {
-  scheduleLayoutSync();
-  if (!activeTargetFrame) activeTargetFrame = requestAnimationFrame(updateActiveTargetFromScroll);
-}, { passive: true });
+window.addEventListener(
+  'scroll',
+  () => {
+    scheduleLayoutSync();
+    if (!activeTargetFrame) activeTargetFrame = requestAnimationFrame(updateActiveTargetFromScroll);
+  },
+  { passive: true },
+);
 window.addEventListener('scrollend', finishScrollJump, { passive: true });
 window.addEventListener('resize', scheduleLayoutSync, { passive: true });
 window.addEventListener('load', () => {
@@ -758,44 +885,91 @@ window.addEventListener('load', () => {
   scheduleLayoutSync();
 });
 
-
-function editorProviders() { return [...providers.filter(p => !p.id.startsWith('custom-')), ...(workingSettings?.customEngines || [])]; }
+function editorProviders() {
+  return [
+    ...providers.filter((p) => !p.id.startsWith('custom-')),
+    ...(workingSettings?.customEngines || []),
+  ];
+}
 function applyTheme() {
   const preference = workingSettings?.theme || currentSettings?.theme || 'system';
-  document.documentElement.dataset.theme = preference === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : preference;
+  document.documentElement.dataset.theme =
+    preference === 'system'
+      ? matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light'
+      : preference;
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
-document.querySelector('#theme').addEventListener('change', event => { workingSettings.theme = event.target.value; applyTheme(); });
+document.querySelector('#theme').addEventListener('change', (event) => {
+  workingSettings.theme = event.target.value;
+  applyTheme();
+});
 document.querySelector('#add-engine').addEventListener('click', () => {
   const label = document.querySelector('#engine-name').value.trim();
   const template = document.querySelector('#engine-url').value.trim();
   try {
     const url = new URL(template);
-    if (!label || label.length > 48 || /[\u0000-\u001f\u007f]/.test(label)) throw new Error('Enter an engine name, up to 48 characters.');
-    if (editorProviders().some(e => e.label.toLowerCase() === label.toLowerCase())) throw new Error('Engine names must be unique.');
+    if (!label || label.length > 48 || /[\u0000-\u001f\u007f]/.test(label))
+      throw new Error('Enter an engine name, up to 48 characters.');
+    if (editorProviders().some((e) => e.label.toLowerCase() === label.toLowerCase()))
+      throw new Error('Engine names must be unique.');
     if (workingSettings.customEngines.length >= 12) throw new Error('Add up to 12 custom engines.');
-    if (url.protocol !== 'https:' || url.username || url.password || template.split('{query}').length !== 2 || url.origin.includes('{query}') || url.hash.includes('{query}')) throw new Error('Use an HTTPS URL with one {query} in the path or query parameters.');
+    if (
+      url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      template.split('{query}').length !== 2 ||
+      url.origin.includes('{query}') ||
+      url.hash.includes('{query}')
+    )
+      throw new Error('Use an HTTPS URL with one {query} in the path or query parameters.');
     const id = `custom-${crypto.randomUUID()}`;
     workingSettings.customEngines.push({ id, label, template });
-    workingSettings.engineProfiles[id] = ['default']; workingSettings.enabledEngines.push(id);
-    document.querySelector('#engine-name').value = ''; document.querySelector('#engine-url').value = '';
-    settingsNotice.textContent = 'Engine added. Save settings to use it.'; renderProfileMatrix();
-  } catch (error) { settingsNotice.textContent = error.message; }
+    workingSettings.engineProfiles[id] = ['default'];
+    workingSettings.enabledEngines.push(id);
+    document.querySelector('#engine-name').value = '';
+    document.querySelector('#engine-url').value = '';
+    settingsNotice.textContent = 'Engine added. Save settings to use it.';
+    renderProfileMatrix();
+  } catch (error) {
+    settingsNotice.textContent = error.message;
+  }
 });
-window.searchStack.onCommand(command => {
-  if (command === 'settings') { void openSettings(); return; }
+window.searchStack.onCommand((command) => {
+  if (command === 'settings') {
+    void openSettings();
+    return;
+  }
   if (settingsDialog.open) return;
-  if (command === 'search') { queryInput.focus(); queryInput.select(); }
-  else if (command === 'next' || command === 'previous') {
-    const sections = resultSections(), index = sections.findIndex(s => s.dataset.viewKey === activeViewKey);
-    if (sections.length) selectScanTarget(sections[(index + (command === 'next' ? 1 : -1) + sections.length) % sections.length].dataset.viewKey, { jumpToSection: presentation === 'stack' });
+  if (command === 'search') {
+    queryInput.focus();
+    queryInput.select();
+  } else if (command === 'next' || command === 'previous') {
+    const sections = resultSections(),
+      index = sections.findIndex((s) => s.dataset.viewKey === activeViewKey);
+    if (sections.length)
+      selectScanTarget(
+        sections[(index + (command === 'next' ? 1 : -1) + sections.length) % sections.length]
+          .dataset.viewKey,
+        { jumpToSection: presentation === 'stack' },
+      );
   } else if (command.startsWith('page-')) {
     const section = resultSections()[Number(command.slice(5)) - 1];
-    if (section) selectScanTarget(section.dataset.viewKey, { jumpToSection: presentation === 'stack' });
+    if (section)
+      selectScanTarget(section.dataset.viewKey, { jumpToSection: presentation === 'stack' });
   } else if (command === 'layout') scanModeToggle.click();
 });
-if (window.searchStack.platform !== 'darwin') document.querySelectorAll('.mod').forEach(node => { node.textContent = 'Ctrl'; });
+if (window.searchStack.platform !== 'darwin')
+  document.querySelectorAll('.mod').forEach((node) => {
+    node.textContent = 'Ctrl';
+  });
 
 function savePreferences(patch) {
-  void window.searchStack.savePreferences(patch).then(next => { currentSettings = next; }).catch(error => setError(error.message));
+  void window.searchStack
+    .savePreferences(patch)
+    .then((next) => {
+      currentSettings = next;
+    })
+    .catch((error) => setError(error.message));
 }

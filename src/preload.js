@@ -1,11 +1,25 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+function subscribe(channel, callback) {
+  const listener = (_event, payload) => callback(payload);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+}
+
 contextBridge.exposeInMainWorld('searchStack', {
   platform: process.platform,
-  savePreferences(patch) { return ipcRenderer.invoke('app:preferences', patch); },
-  setActivePage(key) { ipcRenderer.send('app:active-page', key); },
-  onPageFocused(callback) { ipcRenderer.on('app:page-focused', (_event, key) => callback(key)); },
-  onCommand(callback) { ipcRenderer.on('app:command', (_event, command) => callback(command)); },
+  savePreferences(patch) {
+    return ipcRenderer.invoke('app:preferences', patch);
+  },
+  setActivePage(key) {
+    ipcRenderer.send('app:active-page', key);
+  },
+  onPageFocused(callback) {
+    subscribe('app:page-focused', callback);
+  },
+  onCommand(callback) {
+    subscribe('app:command', callback);
+  },
   search(query, providers) {
     return ipcRenderer.invoke('app:search', { query, providers });
   },
@@ -28,40 +42,26 @@ contextBridge.exposeInMainWorld('searchStack', {
     ipcRenderer.send('app:settings-overlay', Boolean(isOpen));
   },
   onProviders(callback) {
-    const listener = (_event, providers) => callback(providers);
-    ipcRenderer.on('app:providers', listener);
-    return () => ipcRenderer.removeListener('app:providers', listener);
+    return subscribe('app:providers', callback);
   },
   onSettings(callback) {
-    const listener = (_event, settings) => callback(settings);
-    ipcRenderer.on('app:settings', listener);
-    return () => ipcRenderer.removeListener('app:settings', listener);
+    return subscribe('app:settings', callback);
   },
   onProviderStatus(callback) {
-    const listener = (_event, status) => callback(status);
-    ipcRenderer.on('app:provider-status', listener);
-    return () => ipcRenderer.removeListener('app:provider-status', listener);
+    return subscribe('app:provider-status', callback);
   },
   onHistoryState(callback) {
-    const listener = (_event, state) => callback(state);
-    ipcRenderer.on('app:history-state', listener);
-    return () => ipcRenderer.removeListener('app:history-state', listener);
+    return subscribe('app:history-state', callback);
   },
   onScrollBy(callback) {
-    const listener = (_event, deltaY) => {
+    return subscribe('app:scroll-by', (deltaY) => {
       if (Number.isFinite(deltaY)) callback(deltaY);
-    };
-    ipcRenderer.on('app:scroll-by', listener);
-    return () => ipcRenderer.removeListener('app:scroll-by', listener);
+    });
   },
   onFocusSearch(callback) {
-    const listener = () => callback();
-    ipcRenderer.on('app:focus-search', listener);
-    return () => ipcRenderer.removeListener('app:focus-search', listener);
+    return subscribe('app:focus-search', () => callback());
   },
   onLayoutChanged(callback) {
-    const listener = () => callback();
-    ipcRenderer.on('app:layout-changed', listener);
-    return () => ipcRenderer.removeListener('app:layout-changed', listener);
+    return subscribe('app:layout-changed', () => callback());
   },
 });
