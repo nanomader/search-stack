@@ -12,10 +12,20 @@ each engine finds, and put two results side by side. Your browser tabs can take 
 Google, Bing, DuckDuckGo, Yahoo, Baidu, Yandex—or add your own. Pick an engine for
 each side, swap them, or give one page the whole window. Each keeps its place.
 
-![Comparing live Bing and DuckDuckGo results in Search Stack](docs/screenshots/split-day.png)
+![UK walking results with Google, Bing, Yahoo, Baidu, DuckDuckGo and Yandex in the engine selector](docs/screenshots/engines-overview.png)
+
+Or compare two perspectives side by side. Same search, different trails.
+
+![Comparing Bing and DuckDuckGo results, with DuckDuckGo showing United Kingdom](docs/screenshots/split-day.png)
 
 <details>
-<summary>More of a night owl? We have a theme for that.</summary>
+<summary>More engines, and a theme for night owls</summary>
+
+Yahoo and Baidu bring their own perspectives to the same Lake District search.
+
+![Yahoo and Baidu results side by side](docs/screenshots/split-more-engines.png)
+
+Prefer the lights low?
 
 ![Search Stack in Night mode](docs/screenshots/split-night.png)
 

@@ -98,9 +98,13 @@ an installer does not require a GitHub Actions job.
 node scripts/capture-screenshots.js
 ```
 
-This opens an isolated, hidden app, searches live Bing and DuckDuckGo, and writes
-images to `output/playwright/readme/`. Review them before copying selected images
-to `docs/screenshots/`. The query is public and no account is signed in.
+This opens an isolated, hidden app and searches all six built-in engines for
+`best walks in the Lake District`. It captures the engine selector, Bing/DuckDuckGo
+and Yahoo/Baidu comparisons, and the Night theme in `output/playwright/readme/`. Review them before copying selected images
+to `docs/screenshots/`. The query is public and no account is signed in. Region follows the connection and
+provider settings; verify the visible region before publishing UK screenshots.
+Individual engine captures and `outcomes.json` are inspection material only:
+challenge pages can expose network identifiers and must not be copied into Git.
 
 Electron captures each native web view separately. The capture script assembles
 those unaltered surfaces at their actual window coordinates in another hidden

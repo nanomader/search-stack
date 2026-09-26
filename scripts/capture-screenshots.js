@@ -5,7 +5,7 @@ const { _electron: electron, expect } = require('@playwright/test');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { DEFAULT_SETTINGS } = require('../src/settings');
+const { BUILTIN_ENGINES, DEFAULT_SETTINGS } = require('../src/settings');
 
 async function captureWindow(application, filename) {
   const png = await application.evaluate(async ({ BaseWindow, BrowserWindow }) => {
@@ -34,7 +34,10 @@ async function captureWindow(application, filename) {
         )
         .join('');
       await capture.loadURL(
-        `data:text/html,${encodeURIComponent(`<html><body style="margin:0;overflow:hidden">${images}</body></html>`)}`,
+        'data:text/html,<html><body style="margin:0;overflow:hidden"></body></html>',
+      );
+      await capture.webContents.executeJavaScript(
+        `document.body.innerHTML = ${JSON.stringify(images)}`,
       );
       await capture.webContents.executeJavaScript(
         'Promise.all([...document.images].map(image => image.decode()))',
@@ -57,7 +60,7 @@ async function captureWindow(application, filename) {
       path.join(dataDir, 'settings.json'),
       JSON.stringify({
         ...DEFAULT_SETTINGS,
-        enabledEngines: ['bing', 'duckduckgo'],
+        enabledEngines: BUILTIN_ENGINES.map(({ id }) => id),
         theme: 'light',
       }),
     );
@@ -70,12 +73,44 @@ async function captureWindow(application, filename) {
     await application.evaluate(({ BaseWindow }) =>
       BaseWindow.getAllWindows()[0].setContentSize(1440, 900),
     );
-    await page.locator('#query').fill('OpenStreetMap');
+    await page.locator('#query').fill('best walks in the Lake District');
     await page.locator('#query').press('Enter');
-    await expect(page.locator('.engine-state[data-status="ready"]')).toHaveCount(2, {
-      timeout: 30000,
-    });
+    await expect(page.locator('.scan-tab')).toHaveCount(BUILTIN_ENGINES.length);
+    await expect
+      .poll(() => page.locator('.engine-state[data-status="loading"]').count(), { timeout: 30000 })
+      .toBe(0);
+    const outcomes = [];
+    for (const { id } of BUILTIN_ENGINES) {
+      await page.locator(`.scan-tab[data-view-key="${id}:default"]`).click();
+      await expect
+        .poll(() =>
+          application.evaluate(
+            ({ BaseWindow }) =>
+              BaseWindow.getAllWindows()[0].contentView.children.filter((view) => view.getVisible())
+                .length,
+          ),
+        )
+        .toBe(2);
+      await page.waitForTimeout(2000);
+      outcomes.push(
+        await application.evaluate(async ({ BaseWindow }) => {
+          const view = BaseWindow.getAllWindows()[0].contentView.children.find(
+            (view) => view.getVisible() && !view.webContents.getURL().startsWith('app:'),
+          );
+          return {
+            url: view.webContents.getURL(),
+            text: await view.webContents.executeJavaScript(
+              'document.body.innerText.slice(0,18000)',
+            ),
+          };
+        }),
+      );
+      await captureWindow(application, path.join(output, `engine-${id}.png`));
+    }
+    await fs.writeFile(path.join(output, 'outcomes.json'), JSON.stringify(outcomes, null, 2));
     await page.locator('#split-toggle').click();
+    await page.locator('#split-left').selectOption('bing:default');
+    await page.locator('#split-right').selectOption('duckduckgo:default');
     await expect
       .poll(() =>
         application.evaluate(
@@ -88,6 +123,12 @@ async function captureWindow(application, filename) {
     // Lazy content and fonts can settle after the document's load event.
     await page.waitForTimeout(3000);
     await captureWindow(application, path.join(output, 'split-day.png'));
+    await page.locator('#split-left').selectOption('yahoo:default');
+    await page.locator('#split-right').selectOption('baidu:default');
+    await page.waitForTimeout(2000);
+    await captureWindow(application, path.join(output, 'split-more-engines.png'));
+    await page.locator('#split-left').selectOption('bing:default');
+    await page.locator('#split-right').selectOption('duckduckgo:default');
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('Theme', { exact: true }).selectOption('dark');
     await page.getByRole('button', { name: 'Save settings', exact: true }).click();

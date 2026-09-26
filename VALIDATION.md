@@ -145,8 +145,7 @@ separate generated hamster illustration.
 
 ### Published download and Homebrew installation
 
-The public `v0.1.0` release points to commit
-`747f172b87dc2f34050f68b952ec16e5c891a9b0`. All seven source files in the packaged
+The public `v0.1.0` release identifies its source through the release tag. All seven source files in the packaged
 ASAR were byte-compared with the release source. GitHub's uploaded-asset digests
 match the local DMG and ZIP checksums above.
 
@@ -167,3 +166,23 @@ Both public repositories have GitHub Actions disabled. No new Actions run was
 created by publication: the source repo retained its one historical completed
 run, and the tap had zero runs. Public README and illustration URLs returned HTTP
 200 without authentication.
+
+## UK README screenshot refresh
+
+Fresh hidden-window captures used the hotspot connection and the query
+`best walks in the Lake District`, with all six built-in engines enabled.
+DuckDuckGo visibly reported United Kingdom; Bing returned English results from
+UK walking sites. Yahoo and Baidu also returned Lake District results. Google
+and Yandex presented anti-bot challenges, so their pages were excluded from the
+published screenshots. No consent or CAPTCHA was bypassed.
+
+The README includes the six-engine selector, Bing/DuckDuckGo and Yahoo/Baidu
+comparisons, and the Night theme. Captures preserve the real app layout. The capture
+helper now inserts image layers after loading its hidden capture document, avoiding
+Chromium's URL-size limit for detailed screenshots. Application code is unchanged.
+
+The previous screenshot blobs were replaced across the published branch and release
+tag histories. Rewriting documentation history changes commit IDs; release notes
+use the rewritten tag, while the packaged application source and downloads remain
+unchanged. This removes the old screenshots from reachable Git history, not from
+external clones or GitHub's potentially cached old commit URLs.
