@@ -1,135 +1,83 @@
 # Releasing Search Stack
 
-Search Stack uses local builds, GitHub Releases, and a maintainer-owned Homebrew
-tap. The first preview targets Apple silicon Macs running macOS 13 or newer.
-It uses free ad-hoc signing; it is not Developer ID signed or Apple-notarized.
+Build and test on the maintainer's Mac, publish installers on GitHub Releases,
+and update [the Homebrew tap](https://github.com/nanomader/homebrew-tap).
+GitHub Actions stays disabled in both repositories. No hosted build service is
+needed. Apple signing uses the existing developer membership.
 
-## 1. Keep the public repository useful
+The current download targets Apple silicon and macOS 13+. Intel, Windows, and
+Linux installers need qualification on their target platforms before publication.
 
-Keep the README centered on the app: what it does, a real comparison screenshot,
-how to try it, and where to report problems. Keep build internals in the development
-guide. Include the MIT license and contribution guide.
+## Signed macOS release
 
-Before publishing a new repository, review its tracked history and Actions logs: both become public with the source. Search Stack uses the public `nanomader/search-stack` repository.
+The public publisher is `Jacek Musial`, Apple team `85B5U6888H`. Search Stack
+retains its own bundle ID, `dev.searchstack.app`. Its certificate can be shared
+with other apps from this publisher; credentials stay in the local Keychain.
+The notarization profile name is supplied locally, never a password in Git.
 
-`"private": true` in package.json prevents accidental npm publication. It does not
-control GitHub visibility or prevent this desktop app from being open source.
+1. Bump the version in package.json and package-lock.json. Run `npm run verify`.
+2. Build into a fresh output directory, preserving any running app:
 
-## 2. Use GitHub Releases for downloads
+   ```sh
+   npm run package:mac:signed -- --arm64 --config.directories.output=dist/release-VERSION
+   ```
 
-Build and test locally, then attach installers to a versioned GitHub Release.
-Do not use GitHub Actions or rented build machines for this project. The existing
-hosted build workflow has been disabled on GitHub and removed from the checkout.
-Actions must also remain disabled in the Homebrew tap.
+   This signs the app and DMG with Developer ID and hardened runtime, and fails
+   if the signing identity is unavailable. It does **not** notarize or publish.
+   The only runtime entitlement is `com.apple.security.cs.allow-jit`, needed by
+   modern Electron. The preview command `npm run package:mac` remains ad-hoc signed.
 
-Build on an existing Apple silicon Mac. Packaging uses `--publish never`;
-uploading and publishing are separate, deliberate steps. GitHub Releases hosts
-the finished downloads without needing to run a build.
+3. Verify the app with `codesign --verify --deep --strict`, inspect its publisher,
+   hardened-runtime flag and entitlements, and run the hidden-window packaged
+   tests described in [DEVELOPMENT.md](DEVELOPMENT.md).
+4. Submit the signed DMG with `xcrun notarytool submit`, using
+   `--keychain-profile PROFILE --output-format json`. Save the submission ID
+   outside Git. Wait on that ID with `notarytool wait`; do not submit again just
+   because a wait timed out. Continue only after the status is **Accepted**.
+5. Use `xcrun stapler staple` on the DMG and the local app. Validate both tickets.
+   Recreate the ZIP from the stapled app using `ditto -c -k --sequesterRsrc
+--keepParent`. The DMG's ticket covers its embedded signed app; the ZIP carries
+   the app's own ticket. Verify both extracted app copies with strict codesign
+   verification and `spctl --assess --type execute --verbose=2`. Assess the DMG
+   with `spctl --assess --type open --context context:primary-signature`.
+6. Generate SHA-256 checksums **after** stapling and repacking. Record the exact
+   source commit, notarization acceptance, and validation results.
+7. Commit and tag the qualified source, create a draft GitHub release, and upload
+   the DMG, ZIP, and checksums. Verify uploaded digests before publishing.
+8. Update the cask version/checksum. Test the public download and Homebrew install
+   into a temporary app directory. Assess Gatekeeper before any launch: a hidden
+   Electron window cannot hide an OS security warning. Keep the user's normal app
+   and session data untouched. Update documentation with observed results.
 
-```sh
-npm ci
-npm run verify
-npm run package:mac -- --arm64 --config.directories.output=dist/public-preview
-shasum -a 256 dist/public-preview/*.dmg dist/public-preview/*.zip
-```
+Notarization is Apple's automated security check, not App Store distribution.
+A normal first-open confirmation for an internet download can still appear.
+Do not disable Gatekeeper or remove quarantine as part of release qualification.
 
-Run this only while the app in that output directory is closed. Keep binaries in
-Release assets, not Git, Git LFS, or Actions artifacts. A maintainer can upload
-them using the GitHub release page or `gh release upload` from their own machine.
-
-Supported release scope:
-
-| Platform          | Download                | Qualification                                              |
-| ----------------- | ----------------------- | ---------------------------------------------------------- |
-| Apple silicon Mac | ARM64 DMG, optional ZIP | First priority; ad-hoc-signed, unnotarized preview         |
-| Intel Mac         | x64 DMG                 | Add when an existing Intel Mac is available for validation |
-| Windows           | x64 NSIS installer      | Build and test on an existing Windows PC; otherwise defer  |
-| Linux             | x64 AppImage            | Build and test on existing Linux hardware or a local VM    |
-
-The existing .deb target additionally needs a public maintainer email. Do not
-invent one. Packaging success should be followed by launching the packaged app
-with disposable data and testing installation on a clean user account or VM.
-
-For each release:
-
-1. Set the version in package.json and its lockfile.
-2. Run `npm run verify`, commit the prepared version, and record the exact SHA.
-3. Create a matching tag, for example `v0.1.0`.
-4. Build locally from that tag on each platform that can be tested without paid infrastructure.
-5. Create a **draft prerelease**, attach only qualified installers, and include
-   SHA-256 checksums and the source commit in its notes.
-6. Test the downloaded files. Explain unsigned status and platform limits.
-7. Publish the prerelease and replace the README's source-only status with actual
-   download links. Use the versioned release URL: GitHub's `releases/latest` link
-   does not represent a preview-only release reliably.
-
-The current app has no automatic updater. Initial users download a new version
-from Releases, or run `brew upgrade --cask nanomader/tap/search-stack`.
-
-## 3. Maintain the Homebrew cask
-
-A macOS GUI app uses a **cask**, a small Ruby file describing a prebuilt download.
-The cask lives in [nanomader/homebrew-tap](https://github.com/nanomader/homebrew-tap), independently of the main Homebrew catalog.
-
-The Homebrew install command is:
+## Homebrew and updates
 
 ```sh
 brew install --cask nanomader/tap/search-stack
+brew upgrade --cask nanomader/tap/search-stack
 ```
 
-The tap's `Casks/search-stack.rb` should specify the version, immutable GitHub
-Release URL, SHA-256 checksum, homepage, supported architecture, and
-`app "Search Stack.app"`. Point to the exact tested artifact; never use a placeholder
-checksum or advertise an Intel build that does not exist.
+The cask references a versioned release URL and its exact DMG checksum. Keep
+profile deletion out of ordinary uninstall. The app has no automatic updater;
+users update through Homebrew or download a later release.
 
-Test installation, launch, upgrade, and uninstall. Keep profile deletion out of
-ordinary uninstall; any optional purge must be explicit. Update the cask after
-each release. Homebrew is a download/install channel, not an Apple signing service:
-an unsigned app can still trigger Gatekeeper. Do not bypass quarantine in the cask.
+Use a versioned release link in the README while releases are marked as previews.
+The previous 0.1.0 release is ad-hoc signed and unnotarized; do not replace its
+assets with different bytes. Publish a new version instead.
 
-## 4. Expand only when the first path works
+## Other platforms
 
-For Windows, direct download is enough initially; WinGet can be added with a
-manifest referring to a stable installer URL and checksum. For Linux, start with
-AppImage. A .deb, Flathub, or distro repository adds separate maintenance work.
-
-For a smoother macOS installation later, use Developer ID signing and Apple
-notarization. That requires Apple Developer Program membership and signing
-credentials, even when signing locally. It is outside this zero-spend preview.
-
-## 5. Invite people with a clear request
-
-Suggested repository description:
-
-> Compare live search engines side by side. A free desktop app with independent
-> sessions, keyboard shortcuts, and Day/Night themes.
-
-Suggested topics: `search`, `search-engine`, `desktop-app`, `electron`, `macos`,
-`open-source`. Add platform topics only as the corresponding release is qualified.
-
-After a working public download exists, share a short comparison clip and a
-specific request for feedback in relevant search, desktop-app, and open-source
-communities, following each community's posting rules. A useful first audience is
-people who already repeat queries in several engines.
-
-Suggested announcement:
-
-> I built Search Stack because I kept repeating the same search in different tabs.
-> It sends one query to multiple engines and lets you compare two live pages side
-> by side, with independent sessions. It's free and MIT-licensed. The first macOS
-> preview is not notarized. I'd love feedback on installation and whether the comparison
-> workflow helps with a real search you do.
-
-Link to the repository and an actual release. Invite bug reports and contributions;
-do not promise better answers or make claims about a provider's motives.
+Build Windows on an existing Windows PC and Linux on existing hardware or a local
+VM. The Linux .deb target needs a public maintainer email; do not invent one.
+Direct downloads are enough initially. Additional package registries can follow
+when installers and platform behavior have been validated.
 
 ## References
 
+- [Apple Developer ID and notarization](https://developer.apple.com/developer-id/)
+- [Electron notarization and entitlements](https://github.com/electron/notarize)
 - [GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)
-- [GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
-- [Changing repository visibility](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility)
 - [Creating a Homebrew tap](https://docs.brew.sh/How-to-Create-and-Maintain-a-Tap)
-- [Adding software to Homebrew](https://docs.brew.sh/Adding-Software-to-Homebrew)
-- [Opening downloaded apps on macOS](https://support.apple.com/en-us/102445)
-- [Apple Developer Program](https://developer.apple.com/programs/)
-- [WinGet package submission](https://learn.microsoft.com/en-us/windows/package-manager/package/)

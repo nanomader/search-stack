@@ -1,6 +1,6 @@
 {
   "name": "search-stack",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Compare live search engines side by side in a simple desktop app.",
   "homepage": "https://github.com/nanomader/search-stack",
   "repository": {
@@ -21,7 +21,8 @@
     "package:linux": "electron-builder --linux AppImage deb --publish never",
     "test": "node --test tests/*.test.js",
     "test:e2e": "playwright test",
-    "test:live": "node tests/live-smoke.js"
+    "test:live": "node tests/live-smoke.js",
+    "package:mac:signed": "electron-builder --config build/macos-release.cjs --mac dmg zip --publish never"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

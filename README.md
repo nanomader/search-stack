@@ -39,13 +39,10 @@ Prefer the lights low?
 brew install --cask nanomader/tap/search-stack
 ```
 
-Or [download the Mac app](https://github.com/nanomader/search-stack/releases/tag/v0.1.0)
+Or [download the Mac app](https://github.com/nanomader/search-stack/releases/tag/v0.1.1)
 and drag it into Applications. No Node.js or developer tools needed.
 
-**First launch:** this preview isn't Apple-notarized or Developer ID signed. If
-macOS says it cannot verify Search Stack, click **Done**, then open **System
-Settings → Privacy & Security → Open Anyway** for Search Stack and confirm
-**Open**. See [Apple's instructions](https://support.apple.com/en-us/102445).
+The Mac download is **Developer ID signed and Apple-notarized**.
 Intel, Windows, and Linux downloads aren't available yet.
 
 ## A little more room to explore

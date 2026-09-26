@@ -65,8 +65,11 @@ npm run package:win
 npm run package:linux
 ```
 
-Builds are written to `dist/`. Packaging does not publish a release. The macOS
-command produces an ad-hoc-signed preview. This free integrity signature requires
+Builds are written to `dist/`. Packaging does not publish a release.
+Maintainers use `npm run package:mac:signed` for Developer ID packaging; see the
+[release procedure](DISTRIBUTION.md) for notarization and verification.
+
+`npm run package:mac` produces an ad-hoc-signed preview. This free integrity signature requires
 no Apple account and is not a Developer ID signature or notarization. macOS can
 still block a downloaded preview on first launch.
 

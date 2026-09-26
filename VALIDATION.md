@@ -186,3 +186,31 @@ tag histories. Rewriting documentation history changes commit IDs; release notes
 use the rewritten tag, while the packaged application source and downloads remain
 unchanged. This removes the old screenshots from reachable Git history, not from
 external clones or GitHub's potentially cached old commit URLs.
+
+## Signed and notarized macOS release (0.1.1)
+
+The local release configuration uses Developer ID Application signing under team
+`85B5U6888H`, hardened runtime, and only `com.apple.security.cs.allow-jit`.
+Ordinary preview packaging remains ad-hoc signed. Application logic is unchanged;
+all seven packaged source files were byte-compared with the working source.
+
+Validation passed:
+
+- Formatting, five unit tests, and seven source end-to-end scenarios.
+- All seven hidden-window scenarios against the Developer ID-signed app.
+- Strict deep signature verification, expected publisher/team and bundle ID,
+  runtime flag, and entitlement inspection.
+- Apple notarization submission `7eda71a8-0775-4674-b861-aa52489c0310`: **Accepted**.
+- Ticket stapling and validation for the DMG and the app used for the ZIP.
+- Gatekeeper assessment of the DMG, local app, and separately extracted apps from
+  both archives: **accepted**, source **Notarized Developer ID**.
+
+Final SHA-256 checksums, after stapling and ZIP repacking:
+
+- Search-Stack-0.1.1-arm64.dmg: `8b3bc4b3d4b925ec6012dc78961c78d4b7e77c36127cd1c2b781b9c9406e2e99`
+- Search-Stack-0.1.1-arm64.zip: `3ff75829faf35d569e07f8e5dc4c5ecbdf9c420db1e22851db64f2f1513529fd`
+
+Builds and tests ran locally. The existing Apple membership and Keychain
+notarization profile were reused without exporting credentials. No GitHub Actions
+run, Gatekeeper override, or quarantine removal was used. Download/install
+verification is recorded separately after publication.
