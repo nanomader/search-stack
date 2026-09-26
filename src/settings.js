@@ -10,7 +10,7 @@ const MAX_PROFILES = 12;
 const MAX_ACTIVE_PAGES = 12;
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const DEFAULT_SETTINGS = {
-  version: 2, theme: 'system', presentation: 'focus',
+  version: 2, theme: 'system', presentation: 'focus', splitPages: [],
   profiles: [{ id: 'default', name: 'Default' }], customEngines: [],
   enabledEngines: ['google', 'bing', 'yahoo', 'baidu'],
   engineProfiles: Object.fromEntries(BUILTIN_ENGINES.map(({ id }) => [id, ['default']])),
@@ -66,7 +66,11 @@ function validateSettings(value) {
   }));
   const theme = value.theme ?? 'system', presentation = value.presentation ?? 'focus';
   if (!['system', 'light', 'dark'].includes(theme)) throw new Error('Theme is invalid.');
-  if (!['focus', 'stack'].includes(presentation)) throw new Error('Layout is invalid.');
-  return { version: 2, profiles, customEngines, engineProfiles, enabledEngines: [...new Set(enabled)], theme, presentation };
+  if (!['focus', 'stack', 'split'].includes(presentation)) throw new Error('Layout is invalid.');
+  const requestedSplit = value.splitPages ?? [];
+  if (!Array.isArray(requestedSplit) || requestedSplit.length > 2 || requestedSplit.some(key => typeof key !== 'string')) throw new Error('Split pages are invalid.');
+  const availablePages = new Set(Object.entries(engineProfiles).flatMap(([id, profiles]) => profiles.map(profile => `${id}:${profile}`)));
+  const splitPages = [...new Set(requestedSplit)].filter(key => availablePages.has(key));
+  return { version: 2, splitPages, profiles, customEngines, engineProfiles, enabledEngines: [...new Set(enabled)], theme, presentation };
 }
 module.exports = { BUILTIN_ENGINES, DEFAULT_SETTINGS, MAX_ACTIVE_PAGES, validateSettings, validateTemplate, enginesFor, searchUrl, isSafeHttpsUrl };

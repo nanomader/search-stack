@@ -10,6 +10,9 @@ const scanTabs = document.querySelector('#scan-tabs');
 const scanPrevious = document.querySelector('#scan-previous');
 const scanNext = document.querySelector('#scan-next');
 const scanModeToggle = document.querySelector('#scan-mode-toggle');
+const splitToggle = document.querySelector('#split-toggle');
+const splitControls = document.querySelector('#split-controls');
+const splitSelects = [document.querySelector('#split-left'), document.querySelector('#split-right')];
 const settingsDialog = document.querySelector('#settings-dialog');
 const settingsButton = document.querySelector('#settings-button');
 const settingsSaveButton = document.querySelector('#settings-save');
@@ -25,7 +28,9 @@ let settingsSaving = false;
 let currentQuery = '';
 let currentProviderIds = [];
 let activeViewKey = '';
-let focusScan = true;
+let presentation = 'focus';
+let splitKeys = [];
+let activePane = 0;
 let scrollYBeforeFocus = 0;
 let layoutFrame = 0;
 let activeTargetFrame = 0;
@@ -68,10 +73,18 @@ function updateScanNavigation() {
     : `0 of ${buttons.length}`;
   scanPrevious.disabled = activeIndex <= 0;
   scanNext.disabled = activeIndex < 0 || activeIndex >= buttons.length - 1;
-  scanModeToggle.setAttribute('aria-pressed', String(focusScan));
-  scanModeToggle.innerHTML = focusScan
-    ? '▤ Stack'
-    : '⛶ Focus';
+  scanModeToggle.setAttribute('aria-pressed', String(presentation !== 'stack'));
+  scanModeToggle.textContent = presentation === 'stack' ? '⛶ Focus' : '▤ Stack';
+  splitToggle.disabled = buttons.length < 2;
+  splitToggle.title = buttons.length < 2 ? 'Enable at least two engine/profile pages in Settings' : 'Compare two pages side by side';
+  splitToggle.setAttribute('aria-pressed', String(presentation === 'split'));
+  splitToggle.textContent = presentation === 'split' ? '⛶ Single' : '◫ Split';
+  splitControls.hidden = presentation !== 'split';
+  splitSelects.forEach((select, side) => {
+    select.value = splitKeys[side] || '';
+    select.closest('label').classList.toggle('is-active', activePane === side);
+  });
+  for (const section of resultSections()) section.classList.toggle('is-active-pane', section.dataset.viewKey === activeViewKey);
 }
 
 function renderScanNavigation(targets) {
@@ -102,30 +115,69 @@ function renderScanNavigation(targets) {
     button.append(number, name, profile, state);
     scanTabs.append(button);
   });
+  for (const select of splitSelects) {
+    select.replaceChildren(...targets.map(target => new Option(`${providers.find(p => p.id === target.providerId)?.label || target.providerId} · ${target.profileName}`, target.viewKey)));
+  }
   updateScanNavigation();
+}
+
+function reconcileSplitKeys() {
+  const keys = resultSections().map(section => section.dataset.viewKey);
+  const right = keys.includes(splitKeys[1]) ? splitKeys[1] : '';
+  const left = keys.includes(splitKeys[0]) ? splitKeys[0] : keys.find(key => key !== right);
+  splitKeys = [left, right && right !== left ? right : keys.find(key => key !== left)].filter(Boolean);
 }
 
 function applyPresentation() {
   const sections = resultSections();
-  document.body.dataset.presentation = focusScan ? 'focus' : 'stack';
+  reconcileSplitKeys();
+  if (presentation === 'split' && sections.length) {
+    if (sections.length < 2) presentation = 'focus';
+    else activeViewKey = splitKeys[activePane];
+  }
+  document.body.dataset.presentation = sections.length ? presentation : 'focus';
   scanToolbar.hidden = sections.length === 0;
   for (const section of sections) {
-    section.hidden = focusScan && section.dataset.viewKey !== activeViewKey;
+    const key = section.dataset.viewKey;
+    section.hidden = presentation === 'split' ? !splitKeys.includes(key) : presentation === 'focus' && key !== activeViewKey;
+    section.dataset.pane = splitKeys[0] === key ? 'left' : 'right';
   }
   updateScanNavigation();
   window.searchStack.setActivePage(activeViewKey);
   scheduleLayoutSync();
 }
 
+function chooseSplitPage(side, key) {
+  if (!resultSections().some(section => section.dataset.viewKey === key)) return;
+  const otherSide = 1 - side;
+  if (splitKeys[otherSide] === key) splitKeys[otherSide] = splitKeys[side];
+  splitKeys[side] = key;
+  activePane = side;
+  applyPresentation();
+  savePreferences({ presentation, splitPages: splitKeys });
+}
+
+function enterSplit() {
+  if (resultSections().length < 2) return;
+  if (presentation === 'stack') {
+    cancelScrollJump();
+    scrollYBeforeFocus = window.scrollY;
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+  splitKeys = [activeViewKey, splitKeys.find(key => key !== activeViewKey)];
+  activePane = 0;
+  presentation = 'split';
+  applyPresentation();
+  savePreferences({ presentation, splitPages: splitKeys });
+}
+
 function selectScanTarget(viewKey, { jumpToSection = false } = {}) {
-  const section = resultSections().find((item) => item.dataset.viewKey === viewKey);
+  const section = resultSections().find(item => item.dataset.viewKey === viewKey);
   if (!section) return;
+  if (presentation === 'split') { chooseSplitPage(activePane, viewKey); return; }
   activeViewKey = viewKey;
   window.searchStack.setActivePage(viewKey);
-  if (focusScan) {
-    applyPresentation();
-    return;
-  }
+  if (presentation === 'focus') { applyPresentation(); return; }
   updateScanNavigation();
   if (jumpToSection) {
     scrollJumpPending = true;
@@ -154,32 +206,32 @@ function moveScanTarget(step) {
   const buttons = [...scanTabs.querySelectorAll('button[data-view-key]')];
   const index = buttons.findIndex((button) => button.dataset.viewKey === activeViewKey);
   const next = buttons[index + step];
-  if (next) selectScanTarget(next.dataset.viewKey, { jumpToSection: !focusScan });
+  if (next) selectScanTarget(next.dataset.viewKey, { jumpToSection: presentation === 'stack' });
 }
 
 function enterFocusScan(viewKey = activeViewKey) {
   if (!resultSections().length) return;
-  if (!focusScan) {
+  if (presentation === 'stack') {
     cancelScrollJump();
     scrollYBeforeFocus = window.scrollY;
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
   const target = resultSections().find((section) => section.dataset.viewKey === viewKey);
   if (target) activeViewKey = viewKey;
-  focusScan = true;
+  presentation = 'focus';
   applyPresentation();
 }
 
 function exitFocusScan() {
-  if (!focusScan) return;
-  focusScan = false;
+  if (presentation === 'stack') return;
+  presentation = 'stack';
   applyPresentation();
   requestAnimationFrame(() => window.scrollTo({ top: scrollYBeforeFocus, behavior: 'auto' }));
 }
 
 function updateActiveTargetFromScroll() {
   activeTargetFrame = 0;
-  if (focusScan || scrollJumpPending) return;
+  if (presentation !== 'stack' || scrollJumpPending) return;
   const sections = resultSections();
   if (!sections.length) return;
   const anchor = Math.min(window.innerHeight * 0.35, window.innerHeight - 100);
@@ -319,9 +371,9 @@ function syncLayout() {
     rectangles.push({
       viewKey: slot.dataset.viewKey,
       x: Math.round(rect.left),
-      y: Math.round(Math.max(rect.top, focusScan ? 0 : 96)),
+      y: Math.round(Math.max(rect.top, presentation === 'stack' ? 96 : 0)),
       width: Math.round(rect.width),
-      height: Math.round(Math.max(0, rect.bottom - Math.max(rect.top, focusScan ? 0 : 96))),
+      height: Math.round(Math.max(0, rect.bottom - Math.max(rect.top, presentation === 'stack' ? 96 : 0))),
     });
   }
   window.searchStack.syncLayout(rectangles);
@@ -361,11 +413,11 @@ async function submitSearch(query) {
 
   clearError();
   const firstSearch = !currentQuery;
-  if (firstSearch) focusScan = currentSettings.presentation !== 'stack';
+  if (firstSearch) { presentation = currentSettings.presentation; splitKeys = [...currentSettings.splitPages]; }
   currentQuery = normalized;
   currentProviderIds = providerIds;
   queryInput.value = normalized;
-  activeViewKey = targets[0].viewKey;
+  if (!targets.some(target => target.viewKey === activeViewKey)) activeViewKey = targets[0].viewKey;
   emptyState.hidden = true;
   results.querySelectorAll('.engine-section').forEach((section) => section.remove());
   targets.forEach((target, index) => results.append(createResultSection(target, index)));
@@ -589,16 +641,35 @@ newProfileInput.addEventListener('keydown', (event) => {
 });
 settingsSaveButton.addEventListener('click', () => void saveSettings());
 scanModeToggle.addEventListener('click', () => {
-  if (focusScan) exitFocusScan();
+  if (presentation !== 'stack') exitFocusScan();
   else enterFocusScan();
-  savePreferences({ presentation: focusScan ? 'focus' : 'stack' });
+  savePreferences({ presentation });
+});
+splitToggle.addEventListener('click', () => {
+  if (presentation === 'split') { enterFocusScan(); savePreferences({ presentation }); }
+  else enterSplit();
+});
+splitSelects.forEach((select, side) => {
+  select.addEventListener('focus', () => {
+    if (presentation !== 'split') return;
+    activePane = side; activeViewKey = splitKeys[side];
+    window.searchStack.setActivePage(activeViewKey); updateScanNavigation();
+  });
+  select.addEventListener('change', () => chooseSplitPage(side, select.value));
+});
+document.querySelector('#split-swap').addEventListener('click', () => {
+  splitKeys.reverse(); applyPresentation(); savePreferences({ splitPages: splitKeys });
+});
+window.searchStack.onPageFocused(key => {
+  if (presentation !== 'split' || !splitKeys.includes(key)) return;
+  activePane = splitKeys.indexOf(key); activeViewKey = key; updateScanNavigation();
 });
 scanPrevious.addEventListener('click', () => moveScanTarget(-1));
 scanNext.addEventListener('click', () => moveScanTarget(1));
 
 scanTabs.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-view-key]');
-  if (button) selectScanTarget(button.dataset.viewKey, { jumpToSection: !focusScan });
+  if (button) selectScanTarget(button.dataset.viewKey, { jumpToSection: presentation === 'stack' });
 });
 scanTabs.addEventListener('keydown', (event) => {
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
@@ -609,7 +680,7 @@ scanTabs.addEventListener('keydown', (event) => {
   const index = buttons.indexOf(button);
   const next = buttons[index + (event.key === 'ArrowRight' ? 1 : -1)];
   if (next) {
-    selectScanTarget(next.dataset.viewKey, { jumpToSection: !focusScan });
+    selectScanTarget(next.dataset.viewKey, { jumpToSection: presentation === 'stack' });
     next.focus();
   }
 });
@@ -620,6 +691,11 @@ results.addEventListener('click', (event) => {
     enterFocusScan(focusButton.dataset.focusView);
     return;
   }
+  const clickedSection = event.target.closest('.engine-section');
+  if (presentation === 'split' && clickedSection) {
+    activeViewKey = clickedSection.dataset.viewKey; activePane = splitKeys.indexOf(activeViewKey);
+    window.searchStack.setActivePage(activeViewKey); updateScanNavigation();
+  }
   const button = event.target.closest('button[data-action]');
   if (!button || button.disabled) return;
   const section = button.closest('.engine-section');
@@ -629,7 +705,8 @@ results.addEventListener('click', (event) => {
 window.searchStack.onProviders((list) => { providers = list; if (currentSettings) makeProviderPicker(list); });
 window.searchStack.onSettings((nextSettings) => {
   currentSettings = nextSettings;
-  focusScan = currentSettings.presentation !== 'stack';
+  presentation = currentSettings.presentation;
+  splitKeys = [...currentSettings.splitPages];
   applyTheme();
   makeProviderPicker(providers);
   applyPresentation();
@@ -711,10 +788,10 @@ window.searchStack.onCommand(command => {
   if (command === 'search') { queryInput.focus(); queryInput.select(); }
   else if (command === 'next' || command === 'previous') {
     const sections = resultSections(), index = sections.findIndex(s => s.dataset.viewKey === activeViewKey);
-    if (sections.length) selectScanTarget(sections[(index + (command === 'next' ? 1 : -1) + sections.length) % sections.length].dataset.viewKey, { jumpToSection: !focusScan });
+    if (sections.length) selectScanTarget(sections[(index + (command === 'next' ? 1 : -1) + sections.length) % sections.length].dataset.viewKey, { jumpToSection: presentation === 'stack' });
   } else if (command.startsWith('page-')) {
     const section = resultSections()[Number(command.slice(5)) - 1];
-    if (section) selectScanTarget(section.dataset.viewKey, { jumpToSection: !focusScan });
+    if (section) selectScanTarget(section.dataset.viewKey, { jumpToSection: presentation === 'stack' });
   } else if (command === 'layout') scanModeToggle.click();
 });
 if (window.searchStack.platform !== 'darwin') document.querySelectorAll('.mod').forEach(node => { node.textContent = 'Ctrl'; });

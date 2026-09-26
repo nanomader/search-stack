@@ -127,6 +127,12 @@ test('full app: custom engines, duplicate Google profiles, isolated persistent c
   const customPage = application.windows().find(p => p.url().startsWith('https://example.com/'));
   expect(new URL(customPage.url()).searchParams.get('q')).toBe('cats & dogs');
   const personal = settings.profiles.find(p=>p.name==='Personal').id;
+  const ids = await providerIds();
+  await page.locator('#split-toggle').click();
+  await page.getByLabel('Right search page',{exact:true}).selectOption(`google:${personal}`);
+  await expect(page.getByLabel('Left search page',{exact:true})).toHaveValue('google:default');
+  await expect.poll(async () => (await visibleNativeViews()).map(view=>view.id)).toEqual(ids.slice(0,2));
+  expect(await application.evaluate(async ({webContents},ids) => Promise.all(ids.slice(0,2).map(id=>webContents.fromId(id).executeJavaScript('location.hostname'))),ids)).toEqual(['www.google.com','www.google.com']);
   await application.evaluate(async ({session}, personal) => {
     const regular = session.fromPartition('persist:search-google-default');
     const other = session.fromPartition(`persist:search-google-${personal}`);
@@ -197,4 +203,93 @@ test('full app: remote pages have no app bridge and unsafe navigation stays bloc
   await page.getByRole('button',{name:'Save settings',exact:true}).click();
   await expect(page.locator('.engine-section')).toHaveCount(0);
   await expect.poll(async () => (await providerIds()).length).toBe(0);
+});
+
+async function visibleNativeViews() {
+  return application.evaluate(({BaseWindow}) => BaseWindow.getAllWindows()[0].contentView.children.slice(1)
+    .filter(view => view.getVisible()).map(view => ({id:view.webContents.id,...view.getBounds()})).sort((a,b)=>a.x-b.x));
+}
+async function expectPair(left, right) {
+  await expect(page.getByLabel('Left search page',{exact:true})).toHaveValue(left);
+  await expect(page.getByLabel('Right search page',{exact:true})).toHaveValue(right);
+  const ids = await application.evaluate(({BaseWindow}) => BaseWindow.getAllWindows()[0].contentView.children.slice(1)
+    .filter(view=>view.webContents.getURL().startsWith('https:')).map(view=>({id:view.webContents.id,host:new URL(view.webContents.getURL()).hostname})));
+  const host = {google:'www.google.com',bing:'www.bing.com',yahoo:'search.yahoo.com',baidu:'www.baidu.com'};
+  await expect.poll(async () => (await visibleNativeViews()).map(view=>view.id)).toEqual([
+    ids.find(view=>view.host===host[left.split(':')[0]]).id,
+    ids.find(view=>view.host===host[right.split(':')[0]]).id,
+  ]);
+}
+test('split: independent native panes, choice, swap, shortcuts, geometry and modal visibility', async () => {
+  await fixtureSessions(); await search();
+  const ids = await providerIds();
+  await application.evaluate(async ({webContents},ids) => {
+    await webContents.fromId(ids[0]).executeJavaScript('window.scrollTo(0,420); window.preserved = "left"');
+    await webContents.fromId(ids[1]).executeJavaScript('window.scrollTo(0,730); window.preserved = "right"');
+  },ids);
+  await page.getByRole('button',{name:'◫ Split',exact:true}).click();
+  await expect(page.locator('body')).toHaveAttribute('data-presentation','split');
+  await expectPair('google:default','bing:default');
+  const panes = await visibleNativeViews();
+  expect(panes[0].x).toBe(0); expect(panes[0].y).toBe(130);
+  expect(panes[1].x).toBeGreaterThanOrEqual(panes[0].width);
+  expect(panes[0].height).toBe(panes[1].height);
+  expect(panes[1].x + panes[1].width).toBe(await page.evaluate(()=>innerWidth));
+  expect(await application.evaluate(async ({webContents},ids) => Promise.all(ids.slice(0,2).map(id=>webContents.fromId(id).executeJavaScript('[scrollY,window.preserved]'))),ids)).toEqual([[420,'left'],[730,'right']]);
+  await page.getByLabel('Right search page',{exact:true}).selectOption('yahoo:default');
+  await expectPair('google:default','yahoo:default');
+  await page.getByLabel('Left search page',{exact:true}).selectOption('yahoo:default');
+  await expectPair('yahoo:default','google:default');
+  await page.getByRole('button',{name:'Swap comparison sides',exact:true}).click();
+  await expectPair('google:default','yahoo:default');
+  await nativeInput(ids[2], '2', [process.platform === 'darwin' ? 'meta' : 'control']);
+  await expectPair('google:default','bing:default');
+  // Left stays unchanged when the right site's focused shortcut switches engines.
+  await expect(page.locator('#right-choice')).toHaveClass(/is-active/);
+  expect(await providerIds()).toEqual(ids);
+  await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await expect.poll(visibleNativeViews).toEqual([]);
+  await page.getByLabel('Theme',{exact:true}).selectOption('dark');
+  await page.getByRole('button',{name:'Save settings',exact:true}).click();
+  await expectPair('google:default','bing:default');
+  await page.screenshot({path:'output/playwright/split-night.png'});
+  await application.evaluate(({BaseWindow})=>BaseWindow.getAllWindows()[0].setContentSize(680,480));
+  await expect.poll(async ()=>(await visibleNativeViews()).map(({height})=>height)).toEqual([350,350]);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:'output/playwright/split-compact.png'});
+  await page.getByRole('button',{name:'⛶ Single',exact:true}).click();
+  await expect(page.locator('body')).toHaveAttribute('data-presentation','focus');
+  await expect(page.locator('.engine-section:visible')).toHaveAttribute('data-view-key','bing:default');
+  expect(await providerIds()).toEqual(ids);
+});
+test('split: saved pair survives searches and restart, repairs removed choices, and recovers one side', async () => {
+  await fixtureSessions(); await search();
+  await page.locator('#split-toggle').click();
+  await page.getByLabel('Left search page',{exact:true}).selectOption('baidu:default');
+  await page.getByLabel('Right search page',{exact:true}).selectOption('yahoo:default');
+  await search('second query');
+  await expectPair('baidu:default','yahoo:default');
+  // Await persisted preference through the app before restarting its process.
+  await expect.poll(async()=> (await page.evaluate(()=>window.searchStack.getSettings())).splitPages).toEqual(['baidu:default','yahoo:default']);
+  await application.close(); await launch();
+  await fixtureSessions(); await search('after restart');
+  await expectPair('baidu:default','yahoo:default');
+  const ids=await providerIds();
+  await application.evaluate(({webContents},id)=>webContents.fromId(id).forcefullyCrashRenderer(),ids[2]);
+  const right=page.locator('.engine-section[data-pane="right"]:visible');
+  await expect(right.getByRole('button',{name:'Retry page',exact:true})).toBeVisible();
+  await right.getByRole('button',{name:'Retry page',exact:true}).click();
+  await expect(right.locator('.engine-state')).toHaveAttribute('data-status','ready');
+  await expectPair('baidu:default','yahoo:default');
+  await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await page.getByLabel('Enable Baidu',{exact:true}).uncheck();
+  await page.getByRole('button',{name:'Save settings',exact:true}).click();
+  await expectPair('google:default','yahoo:default');
+  await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await page.getByLabel('Enable Yahoo',{exact:true}).uncheck();
+  await page.getByLabel('Enable Bing',{exact:true}).uncheck();
+  await page.getByRole('button',{name:'Save settings',exact:true}).click();
+  await expect(page.locator('body')).toHaveAttribute('data-presentation','focus');
+  await expect(page.locator('#split-toggle')).toBeDisabled();
+  await expect.poll(async()=> (await visibleNativeViews()).length).toBe(1);
 });

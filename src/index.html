@@ -26,6 +26,12 @@
         <div id="scan-tabs" class="scan-tabs" role="group" aria-label="Jump between search pages"></div>
         <button id="scan-next" class="icon-button" type="button" aria-label="Next search page" title="Next page (Ctrl+Tab)">›</button>
         <span id="scan-counter" class="scan-counter" aria-live="polite"></span>
+        <div id="split-controls" hidden>
+          <label class="split-choice" id="left-choice"><span>Left</span><select id="split-left" aria-label="Left search page"></select></label>
+          <button id="split-swap" class="icon-button" type="button" aria-label="Swap comparison sides" title="Swap left and right">⇄</button>
+          <label class="split-choice" id="right-choice"><span>Right</span><select id="split-right" aria-label="Right search page"></select></label>
+        </div>
+        <button id="split-toggle" class="scan-mode-toggle" type="button" aria-pressed="false" title="Compare two pages side by side">◫ Split</button>
         <button id="scan-mode-toggle" class="scan-mode-toggle" type="button" aria-pressed="true">Stack</button>
       </nav>
       <div id="empty-state" class="empty-state">

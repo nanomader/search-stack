@@ -46,14 +46,14 @@ input[type="checkbox"] { accent-color:var(--accent); }
 .provider-slot { height:calc(100vh - 140px); min-height:300px; background:var(--surface); }
 .engine-placeholder { display:grid; align-content:center; justify-items:center; gap:14px; height:100%; padding:30px; text-align:center; color:var(--muted); }
 .engine-section { margin-bottom:12px; scroll-margin-top:96px; border-bottom:1px solid var(--line); }
-body[data-presentation="focus"] { height:100vh; overflow:hidden; }
-body[data-presentation="focus"] .page-shell { height:calc(100vh - 54px); display:flex; flex-direction:column; }
-body[data-presentation="focus"] .results { flex:1; min-height:0; display:flex; flex-direction:column; }
-body[data-presentation="focus"] .scan-toolbar { flex:none; }
-body[data-presentation="focus"] .engine-section { flex:1; display:flex; flex-direction:column; min-height:0; margin:0; border:0; }
-body[data-presentation="focus"] .engine-heading { flex:none; }
-body[data-presentation="focus"] .provider-slot { flex:1; height:auto; min-height:0; }
-body[data-presentation="focus"] .focus-engine-button { display:none; }
+body:is([data-presentation="focus"],[data-presentation="split"]) { height:100vh; overflow:hidden; }
+body:is([data-presentation="focus"],[data-presentation="split"]) .page-shell { height:calc(100vh - 54px); display:flex; flex-direction:column; }
+body:is([data-presentation="focus"],[data-presentation="split"]) .results { flex:1; min-height:0; display:flex; flex-direction:column; }
+body:is([data-presentation="focus"],[data-presentation="split"]) .scan-toolbar { flex:none; }
+body:is([data-presentation="focus"],[data-presentation="split"]) .engine-section { flex:1; display:flex; flex-direction:column; min-height:0; margin:0; border:0; }
+body:is([data-presentation="focus"],[data-presentation="split"]) .engine-heading { flex:none; }
+body:is([data-presentation="focus"],[data-presentation="split"]) .provider-slot { flex:1; height:auto; min-height:0; }
+body:is([data-presentation="focus"],[data-presentation="split"]) .focus-engine-button { display:none; }
 .empty-state { flex:1; min-height:390px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px 25px; }
 .empty-mark { font-size:46px; color:var(--accent); }
 .empty-state h1 { margin:10px 0; font-size:27px; font-weight:650; letter-spacing:-.6px; }
@@ -103,3 +103,26 @@ summary { cursor:pointer; }
 
 .page-location { color:var(--muted); font-size:10px; max-width:230px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 @media(max-width:800px) { .page-location { max-width:110px; } }
+
+/* The same native views occupy two fixed grid cells; no duplicate sessions. */
+#split-controls { display:flex; flex:1; min-width:0; align-items:center; gap:8px; }
+.split-choice { display:flex; flex:1; min-width:0; align-items:center; gap:6px; color:var(--muted); font-size:11px; }
+.split-choice select { width:100%; min-width:0; height:30px; padding:3px 7px; }
+.split-choice.is-active { color:var(--accent); }
+.split-choice.is-active select { border-color:var(--accent); }
+body[data-presentation="split"] .results { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-rows:42px minmax(0,1fr); column-gap:1px; background:var(--line); }
+body[data-presentation="split"] .scan-toolbar { grid-column:1 / -1; grid-row:1; }
+body[data-presentation="split"] :is(#scan-tabs,#scan-previous,#scan-next,#scan-counter) { display:none; }
+body[data-presentation="split"] .engine-section { grid-row:2; min-width:0; }
+body[data-presentation="split"] .engine-section[data-pane="left"] { grid-column:1; }
+body[data-presentation="split"] .engine-section[data-pane="right"] { grid-column:2; }
+body[data-presentation="split"] .engine-heading { padding-inline:6px; box-shadow:inset 0 2px transparent; }
+body[data-presentation="split"] .is-active-pane .engine-heading { box-shadow:inset 0 2px var(--accent); }
+body[data-presentation="split"] .engine-tools { flex:none; }
+body[data-presentation="split"] .engine-state { max-width:95px; }
+body[data-presentation="split"] .engine-name-wrap { overflow:hidden; }
+body[data-presentation="split"] .engine-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media(max-width:1000px) {
+  body[data-presentation="split"] :is(.page-location,.profile-badge) { display:none; }
+  body[data-presentation="split"] .engine-state { max-width:60px; }
+}

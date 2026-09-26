@@ -28,3 +28,14 @@ test('settings reject unknown profiles, duplicate names and unsafe custom engine
   s = structuredClone(DEFAULT_SETTINGS); s.customEngines.push({id:'google',label:'Fake',template:'https://example.com?q={query}'}); assert.throws(() => validateSettings(s));
   s = structuredClone(DEFAULT_SETTINGS); s.theme = 'unknown'; assert.throws(() => validateSettings(s));
 });
+test('split preferences migrate safely and discard removed profile references', () => {
+  const s = structuredClone(DEFAULT_SETTINGS);
+  s.presentation = 'split'; s.splitPages = ['google:default','bing:default'];
+  assert.deepEqual(validateSettings(s).splitPages,s.splitPages);
+  s.splitPages = ['google:missing','bing:default'];
+  assert.deepEqual(validateSettings(s).splitPages,['bing:default']);
+  s.splitPages = ['google:default','google:default'];
+  assert.deepEqual(validateSettings(s).splitPages,['google:default']);
+  s.splitPages = {left:'google:default'}; assert.throws(()=>validateSettings(s));
+  delete s.splitPages; assert.deepEqual(validateSettings(s).splitPages,[]);
+});

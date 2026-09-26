@@ -244,7 +244,11 @@ function createProviderView(providerId, profileId) {
     sendStatus(state, 'crashed', { message: `Page stopped (${details.reason}). Reload to recover.` });
   });
   installShortcuts(view.webContents);
-  view.webContents.on('focus', () => { activeViewKey = key; });
+  view.webContents.on('focus', () => {
+    if (!currentViewKeys.has(key) || !view.getVisible() || settingsOverlayOpen) return;
+    activeViewKey = key;
+    sendToApp('app:page-focused', key);
+  });
   view.webContents.on('did-fail-load', (_event, errorCode, errorDescription, _validatedURL, isMainFrame) => {
     if (isMainFrame && errorCode !== -3) sendStatus(state, 'error', { message: errorDescription });
   });
@@ -594,8 +598,9 @@ ipcMain.handle('app:clear-search-views', (event) => {
   if (!isAppRenderer(event.sender)) throw new Error('Unauthorized app message.');
   clearActiveSearchViews();
 });
-ipcMain.handle('app:get-settings', (event) => {
+ipcMain.handle('app:get-settings', async (event) => {
   if (!isAppRenderer(event.sender)) throw new Error('Unauthorized app message.');
+  await settingsQueue;
   return cloneSettings(settings);
 });
 ipcMain.handle('app:save-settings', async (event, payload) => {
@@ -608,6 +613,7 @@ ipcMain.handle('app:preferences', (event, patch) => {
     const next = validateSettings({ ...settings,
       enabledEngines: patch?.enabledEngines ?? settings.enabledEngines,
       presentation: patch?.presentation ?? settings.presentation,
+      splitPages: patch?.splitPages ?? settings.splitPages,
     });
     await persistSettings(next); settings = next;
     return cloneSettings(settings);

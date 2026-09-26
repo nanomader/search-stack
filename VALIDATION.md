@@ -6,17 +6,24 @@ existing Search Stack sessions. Subsequent automation runs use hidden windows.
 
 ## Automated checks
 
-All four unit tests and five full-app scenarios passed locally.
+All five unit tests and seven full-app scenarios passed locally.
 
 - `npm test`: migration of legacy settings, stable profile identifiers, query
-  encoding, template URL restrictions, profile/engine validation.
-- `npm run test:e2e`: five scenarios exercising the running Electron app:
+  encoding, template URL restrictions, profile/engine validation, split preference
+  migration and validation.
+- `npm run test:e2e`: seven scenarios exercising the running Electron app:
   compact geometry and resize; switching and preserved scroll; provider-focused
   shortcuts; navigation; theme changes without replacing views; modal/native
   view visibility; failure, stop and crash recovery; custom engines and duplicate
   Google profiles; isolated cookies surviving process restart; confirmed profile
   deletion and cancellation; a real infinite loop in a remote renderer; remote
   privilege isolation; blocked HTTP navigation/pop-ups; inactive-view cleanup.
+- Split coverage verifies two real native views with independent scroll positions,
+  engine/profile selection (including two Google profiles), swapping, shortcuts
+  routed to the active side, non-overlapping bounds at normal and minimum sizes,
+  modal visibility, saved choices across queries and process restart, recovery of
+  a crashed side, replacement of disabled choices, and fallback to a single page.
+  Every test launch asserts that its native window is hidden.
 - The frozen-renderer test uncovered that Electron's `unresponsive` event alone
   did not reliably fire for composed views. The app now also checks the visible
   page's isolated preload, and the test verifies detection and recovery.
@@ -55,6 +62,14 @@ are sent to Chromium; websites retain control over their appearance.
 `npm run package:mac` produced an ARM64 DMG and ZIP. A hidden launch of the actual
 packaged executable verified `app.isPackaged`, four native search pages, switching,
 and saving the Night theme using a temporary data directory.
+
+The split-view build was packaged separately with
+`npm run package:mac -- --config.directories.output=dist/split-preview`, preserving
+the existing running app. Its actual executable loaded live Bing and DuckDuckGo
+search pages side by side, with non-overlapping native bounds and 130 pixels of
+app controls. Swapping sides and opening Settings passed. The test confirmed
+`app.isPackaged` and a hidden native window, and used disposable session data.
+Evidence: `output/playwright/packaged-split.json` (excluded from Git).
 
 ## Scope of confidence
 

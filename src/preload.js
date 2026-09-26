@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('searchStack', {
   platform: process.platform,
   savePreferences(patch) { return ipcRenderer.invoke('app:preferences', patch); },
   setActivePage(key) { ipcRenderer.send('app:active-page', key); },
+  onPageFocused(callback) { ipcRenderer.on('app:page-focused', (_event, key) => callback(key)); },
   onCommand(callback) { ipcRenderer.on('app:command', (_event, command) => callback(command)); },
   search(query, providers) {
     return ipcRenderer.invoke('app:search', { query, providers });

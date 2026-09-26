@@ -2,11 +2,22 @@
 
 One query, several real search websites. Type and press Enter, then switch between
 full-size pages without reloading them or losing their scroll positions. Focus is
-the default; **Stack** restores the vertically scrollable comparison view.
+the default; **Split** compares two pages side by side, and **Stack** restores the
+vertically scrollable comparison view.
 
-The app's controls occupy 130 pixels above the page in Focus mode, with no sidebar
+The app's controls occupy 130 pixels above the page in Focus and Split modes, with no sidebar
 or outer page margins. Back, Forward, Reload, Stop, and the current site's hostname
 remain accessible outside the website. Settings contain the less frequent choices.
+
+Click **Split** after searching to keep the current page on the left and show a
+second page on the right. Each side has an engine/profile dropdown. Use **⇄** to
+swap sides; choosing the other side's page also swaps them. Both pages keep their
+scroll positions and sessions. **Single** expands the active page again.
+
+The highlighted side receives page-switching shortcuts. Click a website, its
+header, or its dropdown to select that side. The pair is remembered across searches
+and restarts. Disabling a selected engine replaces it with an available page;
+with only one page enabled, the app returns to Single mode.
 
 ## Engines and independent sessions
 
@@ -23,6 +34,7 @@ To compare two Google sessions:
 2. Under Google, select both **Default** and **Personal**.
 3. Save and search. Each profile gets its own Google page.
 4. Sign in on the Personal page and leave Default signed out.
+5. Click **Split** and choose **Google · Default** and **Google · Personal**.
 
 Each engine/profile pair has its own persistent cookies, site storage, and cache.
 Existing profiles retain their identifiers and sessions when older settings are
@@ -36,7 +48,7 @@ Disabling an engine retains its data for later use.
 Settings offers **Day**, **Night**, and **System** themes. The saved preference also
 sets Chromium's preferred color scheme; individual websites decide how to use it
 and may retain their own theme. Theme changes preserve loaded pages. Engine
-selection and Focus/Stack preference are saved across restarts.
+selection and Focus/Split/Stack preference are saved across restarts.
 
 Shortcuts work with focus in either the app or an embedded search page:
 
@@ -96,7 +108,8 @@ your normal sessions or take focus from your work. Linux needs a display server;
 for headless environments use `xvfb-run --auto-servernum npm run test:e2e`.
 
 The end-to-end suite exercises native views and IPC, full-size geometry and resize,
-page/scroll preservation, shortcuts from provider pages, result navigation and
+page/scroll preservation, split selection/swap and independent pane geometry,
+saved pairs and removed choices, shortcuts from provider pages, result navigation and
 Back, settings overlays, day/night themes, custom URLs, two Google profiles,
 cookie isolation across restart, deletion cancellation/confirmation, failed and
 stopped loads, renderer crashes, an infinite-loop website, unsafe navigation,
