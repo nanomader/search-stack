@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>Search Stack</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="Search Stack home">
+        <span class="brand-mark" aria-hidden="true">S</span>
+        <span>Search Stack</span>
+      </a>
+      <span class="topbar-note">One query. Real search pages.</span>
+      <button id="settings-button" class="settings-button" type="button" aria-haspopup="dialog" aria-controls="settings-dialog">
+        <span aria-hidden="true">⚙</span> Settings
+      </button>
+    </header>
+
+    <main id="top" class="page-shell">
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">MULTI-ENGINE SEARCH</p>
+        <h1 id="page-title">Search across the web.</h1>
+        <p class="subtitle">Send one query to the search engines you choose, then scroll through their live websites in one place.</p>
+
+        <form id="search-form" class="search-form">
+          <label class="visually-hidden" for="query">Search query</label>
+          <input id="query" name="query" type="search" placeholder="What are you looking for?" autocomplete="off" maxlength="2048" required>
+          <button id="search-button" type="submit"><span aria-hidden="true">↵</span> Search all</button>
+        </form>
+        <div class="engine-picker" id="engine-picker" aria-label="Search engines"></div>
+        <p class="privacy-note">Your query is sent directly to each selected engine. Search Stack does not use a search API.</p>
+      </section>
+
+      <section id="results" class="results" aria-live="polite" aria-label="Search engine results">
+        <nav id="scan-toolbar" class="scan-toolbar" aria-label="Compare search pages" hidden>
+          <div class="scan-context">
+            <span class="scan-kicker">COMPARE LIVE PAGES</span>
+            <span id="scan-counter" class="scan-counter" aria-live="polite">1 of 1</span>
+          </div>
+          <div class="scan-controls">
+            <button id="scan-previous" class="scan-step-button" type="button" aria-label="Previous search page" title="Previous search page" disabled>←</button>
+            <div id="scan-tabs" class="scan-tabs" role="group" aria-label="Jump between search pages"></div>
+            <button id="scan-next" class="scan-step-button" type="button" aria-label="Next search page" title="Next search page" disabled>→</button>
+          </div>
+          <button id="scan-mode-toggle" class="scan-mode-toggle" type="button" aria-pressed="false">
+            <span aria-hidden="true">⛶</span> Focus scan
+          </button>
+        </nav>
+
+        <div id="empty-state" class="empty-state">
+          <div class="empty-icon" aria-hidden="true">⌕</div>
+          <h2>Start with one search</h2>
+          <p>Choose your engines above. Compare them in a vertical stack or switch between full-size pages in Focus scan.</p>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <span>Independent desktop app · Search pages are provided by their respective websites</span>
+        <span class="footer-links"><span>MIT license</span><span aria-hidden="true">·</span><span>v0.1</span></span>
+      </footer>
+    </main>
+
+    <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+      <form id="settings-form" method="dialog">
+        <div class="settings-title-row">
+          <div>
+            <p class="eyebrow">PERSONALIZE YOUR SEARCH</p>
+            <h2 id="settings-title">Settings</h2>
+          </div>
+          <button id="settings-close" class="icon-button" type="button" aria-label="Close settings">×</button>
+        </div>
+        <p class="settings-intro">Each profile keeps a separate sign-in and cookie session for each search engine. Sign in or out on the engine’s real website.</p>
+
+        <section class="settings-section" aria-labelledby="profiles-title">
+          <h3 id="profiles-title">Browser profiles</h3>
+          <p class="settings-help">For example, add “Signed in” and “Signed out”, then choose which ones each engine searches.</p>
+          <div id="profile-list" class="profile-list"></div>
+          <div class="new-profile-row">
+            <label class="visually-hidden" for="new-profile-name">New profile name</label>
+            <input id="new-profile-name" type="text" maxlength="48" placeholder="New profile name" autocomplete="off">
+            <button id="add-profile-button" class="secondary-button" type="button">Add profile</button>
+          </div>
+        </section>
+
+        <section class="settings-section" aria-labelledby="profile-engines-title">
+          <h3 id="profile-engines-title">Search profiles per engine</h3>
+          <p class="settings-help">A profile is searched only when both its engine and profile are enabled.</p>
+          <div id="profile-matrix" class="profile-matrix"></div>
+        </section>
+
+        <p id="settings-notice" class="settings-notice" role="status" aria-live="polite"></p>
+        <div class="settings-actions">
+          <button id="settings-cancel" class="secondary-button" type="button">Cancel</button>
+          <button id="settings-save" class="primary-button" type="button">Save settings</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="renderer.js"></script>
+  </body>
+</html>

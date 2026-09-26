@@ -1,0 +1,53 @@
+{
+  "name": "search-stack",
+  "version": "0.1.0",
+  "description": "Search several live search engines in one vertically scrollable desktop view.",
+  "main": "src/main.js",
+  "author": "Search Stack contributors",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "package:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip",
+    "package:win": "electron-builder --win nsis",
+    "package:linux": "electron-builder --linux AppImage deb"
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "dev.searchstack.app",
+    "productName": "Search Stack",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "category": "Utility",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
+  },
+  "allowScripts": {
+    "electron-winstaller@5.4.0": true
+  }
+}
