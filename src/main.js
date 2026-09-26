@@ -60,6 +60,7 @@ const assetFiles = new Map([
   ['/index.html', 'index.html'],
   ['/styles.css', 'styles.css'],
   ['/renderer.js', 'renderer.js'],
+  ['/icon.png', 'icon.png'],
 ]);
 
 async function loadSettings() {
@@ -598,6 +599,7 @@ function createWindow() {
     minHeight: 480,
     autoHideMenuBar: true,
     title: 'Search Stack',
+    icon: path.join(__dirname, 'icon.png'),
     show: !backgroundTest,
     backgroundColor: '#0b0d10',
   });

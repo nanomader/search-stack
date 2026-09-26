@@ -1,3 +1,5 @@
+<img src="src/icon.png" alt="Search Stack hamster icon" width="96">
+
 # Search Stack
 
 **One query. More perspectives. Fewer tabs.**
@@ -39,10 +41,11 @@ Prefer the lights low?
 brew install --cask nanomader/tap/search-stack
 ```
 
-Or [download the Mac app](https://github.com/nanomader/search-stack/releases/tag/v0.1.1)
-and drag it into Applications. No Node.js or developer tools needed.
+Or [download the Mac app](https://github.com/nanomader/search-stack/releases/tag/v0.1.2)
+and drag it into Applications. Open **Search Stack**, type a query, and press Enter.
 
-The Mac download is **Developer ID signed and Apple-notarized**.
+**Signed and Apple-notarized.** No security workaround or developer tools needed.
+If macOS asks you to confirm the first launch, choose **Open**.
 Intel, Windows, and Linux downloads aren't available yet.
 
 ## A little more room to explore

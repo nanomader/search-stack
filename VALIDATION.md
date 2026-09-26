@@ -237,3 +237,29 @@ reported packaged version 0.1.1. Test profiles were separate from the user's dat
 
 The Homebrew tap points to 0.1.1 with the published DMG checksum. GitHub Actions
 remains disabled for both repositories. The installed app is retained for use.
+
+## Hamster identity release (0.1.2)
+
+The selected Curious Hamster artwork is shared by the README, compact app header,
+and platform packaging. The source PNG is 1024 × 1024 with transparency;
+electron-builder generates the native app icon. The app protocol exposes only
+the specific icon path through its existing asset allowlist.
+
+Formatting, all five unit tests, and all seven hidden-window end-to-end scenarios
+passed. A separate hidden-window check confirmed the image loaded at its expected
+resolution and stayed visible at the minimum window width. Day, Night, and compact
+header captures were visually inspected. All packaged source files, including
+the icon, were byte-compared with the working tree.
+
+All seven scenarios also passed against the Developer ID-signed packaged app
+(18.8 seconds), followed by the packaged logo check. The generated `.icns` was
+extracted and inspected; it contains the hamster and standard/Retina icon sizes.
+Apple submission `0ae80804-7434-4415-a6cc-f6c08cd87714` was **Accepted**. The DMG
+and app were stapled successfully, and the ZIP was recreated from the stapled app.
+Strict signature checks and Gatekeeper assessments passed for separately
+extracted DMG and ZIP apps: **Notarized Developer ID**.
+
+Final download checksums:
+
+- DMG: `c051eb29e0f1a53711b02f3131faab69f6ca522072dcf63fe161878e18e27944`
+- ZIP: `b56c99cea081de9899394a4884aaf964a80dc45abbafa46f40a544222b19d608`

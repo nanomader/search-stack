@@ -8,6 +8,11 @@ needed. Apple signing uses the existing developer membership.
 The current download targets Apple silicon and macOS 13+. Intel, Windows, and
 Linux installers need qualification on their target platforms before publication.
 
+The shared logo source is `src/icon.png`, a 1024px transparent PNG. It is used by
+the app header, README, and electron-builder, which generates the platform icon
+formats during packaging. The selected hamster artwork was generated with the
+built-in image generation tool, then resized for packaging.
+
 ## Signed macOS release
 
 The public publisher is `Jacek Musial`, Apple team `85B5U6888H`. Search Stack

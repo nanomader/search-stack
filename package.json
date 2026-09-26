@@ -1,6 +1,6 @@
 {
   "name": "search-stack",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Compare live search engines side by side in a simple desktop app.",
   "homepage": "https://github.com/nanomader/search-stack",
   "repository": {
@@ -33,6 +33,7 @@
   "build": {
     "appId": "dev.searchstack.app",
     "productName": "Search Stack",
+    "icon": "src/icon.png",
     "directories": {
       "output": "dist"
     },
