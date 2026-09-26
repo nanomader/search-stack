@@ -263,3 +263,10 @@ Final download checksums:
 
 - DMG: `c051eb29e0f1a53711b02f3131faab69f6ca522072dcf63fe161878e18e27944`
 - ZIP: `b56c99cea081de9899394a4884aaf964a80dc45abbafa46f40a544222b19d608`
+
+The published asset digests match those local files. Homebrew upgraded the user's
+closed 0.1.1 app to 0.1.2. Normal LaunchServices startup succeeded with a disposable
+profile, followed by all seven installed-app scenarios (17.4 seconds) and the
+hidden logo check. The installed native icon matches the verified release.
+Quarantine remains present, and Gatekeeper accepts the installed app without an
+override. Both repositories still have GitHub Actions disabled.
