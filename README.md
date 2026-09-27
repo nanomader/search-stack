@@ -1,4 +1,6 @@
-<img src="src/icon.png" alt="Search Stack hamster icon" width="96">
+<p align="center">
+  <img src="docs/images/search-hamster.png" alt="A curious hamster comparing search results on three tiny screens" width="720">
+</p>
 
 # Search Stack
 
@@ -6,10 +8,6 @@
 
 A free, open-source desktop app for comparing search engines. Type once, see what
 each engine finds, and put two results side by side. Your browser tabs can take a nap.
-
-<p align="center">
-  <img src="docs/images/search-hamster.png" alt="A curious hamster comparing search results on three tiny screens" width="720">
-</p>
 
 Google, Bing, DuckDuckGo, Yahoo, Baidu, Yandex—or add your own. Pick an engine for
 each side, swap them, or give one page the whole window. Each keeps its place.
